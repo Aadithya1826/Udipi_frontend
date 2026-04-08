@@ -6,29 +6,32 @@ A modern, responsive React.js frontend for the Data Udipi restaurant ordering sy
 
 ```
 Restaurant APP/
-├── public/
+├── public/                  # Static assets
 │   ├── chef_mascot.jpeg
 │   └── restaurant_bg.png
-├── src/
-│   ├── components/
+├── src/                     # Source code
+│   ├── components/          # Reusable components
 │   │   ├── Header.jsx
 │   │   └── Footer.jsx
-│   ├── pages/
+│   ├── pages/               # Page components
 │   │   ├── Home.jsx
 │   │   ├── Agent.jsx
 │   │   ├── DineIn.jsx
 │   │   └── TakeAway.jsx
-│   ├── styles/
-│   │   ├── globals.css
-│   │   ├── components.css
-│   │   ├── home.css
-│   │   └── pages.css
-│   ├── App.jsx
-│   └── main.jsx
-├── index.html
-├── vite.config.js
-├── package.json
-└── README.md
+│   ├── styles/              # CSS files
+│   │   ├── globals.css      # Global styles
+│   │   ├── components.css   # Component styles
+│   │   ├── home.css         # Home page styles
+│   │   └── pages.css        # Pages styles
+│   ├── App.jsx              # Root component
+│   └── main.jsx             # Entry point
+├── .eslintrc.json           # ESLint configuration
+├── .gitignore               # Git ignore rules
+├── index.html               # HTML entry point
+├── vite.config.js           # Vite configuration
+├── package.json             # Dependencies
+├── README.md                # This file
+└── SETUP.md                 # Setup instructions
 ```
 
 ## Installation
