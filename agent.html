@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Talk to Agent - Data Udipi</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Background with overlay -->
+        <div class="background-image"></div>
+        
+        <!-- Header -->
+        <header class="header agent-header">
+            <!-- Left: Table Number -->
+            <div class="table-indicator">
+                <span class="table-text">Table no :</span>
+                <div class="table-number" id="tableNumberDisplay">06</div>
+            </div>
+
+            <!-- Center: Logo Sign -->
+            <div class="logo-sign small-logo">
+                <div class="sign-board">
+                    <div class="logo-pill">
+                        <div class="logo-half logo-left">DATA</div>
+                        <div class="logo-half logo-right">UDIPI</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Actions & Metadata -->
+            <div class="header-right-container">
+                <div class="header-top-row">
+                    <div class="date-time-box">
+                        <i class="fa-regular fa-calendar"></i>
+                        <span id="currentDate">Tuesday, 10 March 2026</span>
+                        <div class="divider"></div>
+                        <i class="fa-regular fa-clock"></i>
+                        <span id="currentTime">16:54 PM</span>
+                    </div>
+                    
+                    <div class="language-selector">
+                        <button class="lang-btn agent-lang-btn" id="langBtn">
+                            <i class="fa-solid fa-a"></i><i class="fa-solid fa-language" style="font-size: 0.7em;"></i> <span>Languages</span>
+                        </button>
+                        <div class="lang-dropdown" id="langDropdown">
+                            <div class="lang-option" data-lang="English">English</div>
+                            <div class="lang-option" data-lang="Tamil">Tamil</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="header-bottom-row">
+                    <button class="talk-to-waiter-btn">
+                        <i class="fa-solid fa-circle-info"></i> Talk To Your Waiter
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Agent Content -->
+        <main class="agent-main-content">
+            <!-- Mascot and active waveform -->
+            <div class="agent-avatar-section">
+                <div class="waveform-container">
+                    <div class="wave wave-small"></div>
+                    <div class="wave wave-medium"></div>
+                    <div class="wave wave-large"></div>
+                    <div class="wave wave-medium"></div>
+                    <div class="wave wave-small"></div>
+                    
+                    <div class="mascot-wrapper">
+                        <img src="chef_mascot.jpeg" alt="Chef Mascot" class="active-chef-mascot">
+                        <div class="mic-badge"><i class="fa-solid fa-microphone"></i></div>
+                    </div>
+                    
+                    <div class="wave wave-small"></div>
+                    <div class="wave wave-medium"></div>
+                    <div class="wave wave-large"></div>
+                    <div class="wave wave-medium"></div>
+                    <div class="wave wave-small"></div>
+                </div>
+                <div class="slogan-banner smaller-slogan">
+                    Deliciously Vegetarian
+                </div>
+            </div>
+
+            <!-- Chat Interface Window -->
+            <div class="chat-container">
+                <div class="chat-messages" id="chatArea">
+                    <!-- AI message -->
+                    <div class="chat-message ai-message">
+                         <div class="chat-avatar"><img src="chef_mascot.jpeg" alt="AI"></div>
+                         <div class="chat-bubble ai-bubble">
+                             Hello! Welcome to Data Udipi. I'm your AI assistant. You can speak or tap to place your order. Would you like to start ordering?
+                         </div>
+                    </div>
+                    
+                    <!-- Human message -->
+                    <div class="chat-message user-message">
+                         <div class="chat-bubble user-bubble">yes</div>
+                         <div class="chat-avatar user-avatar"><i class="fa-solid fa-user"></i></div>
+                    </div>
+
+                    <!-- AI message -->
+                    <div class="chat-message ai-message">
+                         <div class="chat-avatar"><img src="chef_mascot.jpeg" alt="AI"></div>
+                         <div class="chat-bubble ai-bubble">
+                             Great. How many people are dining at this table?
+                         </div>
+                    </div>
+
+                    <!-- Human message -->
+                    <div class="chat-message user-message">
+                         <div class="chat-bubble user-bubble">Two</div>
+                         <div class="chat-avatar user-avatar"><i class="fa-solid fa-user"></i></div>
+                    </div>
+
+                    <!-- AI message -->
+                    <div class="chat-message ai-message">
+                         <div class="chat-avatar"><img src="chef_mascot.jpeg" alt="AI"></div>
+                         <div class="chat-bubble ai-bubble">
+                             Got it. Would you like to see the menu categories or do you already know what you want?
+                             <div class="listening-indicator">
+                                <div class="dots-wrapper">
+                                    <span class="dot red"></span>
+                                    <span class="dot red"></span>
+                                    <span class="dot red"></span>
+                                </div>
+                                <span class="listening-text">Listening...</span>
+                             </div>
+                         </div>
+                    </div>
+                </div>
+
+                <!-- Voice Input Bar -->
+                <div class="voice-input-wrapper">
+                    <div class="voice-input-bar">
+                        <div class="voice-wave-graphic">
+                            <!-- Generating a sequence of lines to mimic audio form -->
+                            <div class="s-wave h1"></div><div class="s-wave h2"></div><div class="s-wave h1"></div><div class="s-wave h3"></div>
+                            <div class="s-wave h2"></div><div class="s-wave h4"></div><div class="s-wave h2"></div><div class="s-wave h1"></div>
+                            <div class="s-wave h3"></div><div class="s-wave h5"></div><div class="s-wave h3"></div><div class="s-wave h2"></div>
+                            <div class="s-wave h1"></div><div class="s-wave h2"></div><div class="s-wave h4"></div><div class="s-wave h2"></div>
+                            <div class="s-wave h1"></div><div class="s-wave h3"></div><div class="s-wave h5"></div><div class="s-wave h2"></div>
+                            <div class="s-wave h1"></div><div class="s-wave h2"></div><div class="s-wave h3"></div><div class="s-wave h4"></div>
+                            <div class="s-wave h1"></div><div class="s-wave h2"></div><div class="s-wave h4"></div><div class="s-wave h2"></div>
+                            <div class="s-wave h1"></div><div class="s-wave h3"></div><div class="s-wave h5"></div><div class="s-wave h2"></div>
+                        </div>
+                        <button class="mic-btn"><i class="fa-solid fa-microphone"></i></button>
+                    </div>
+                    <button class="mute-btn"><i class="fa-solid fa-volume-xmark"></i></button>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        // Language Dropdown Logic
+        const langBtn = document.getElementById('langBtn');
+        const langDropdown = document.getElementById('langDropdown');
+
+        if(langBtn && langDropdown) {
+            langBtn.addEventListener('click', () => {
+                langDropdown.classList.toggle('show');
+            });
+            window.addEventListener('click', (e) => {
+                if (!langBtn.contains(e.target) && !langDropdown.contains(e.target)) {
+                    langDropdown.classList.remove('show');
+                }
+            });
+        }
+
+        // Clock Update
+        function updateDateTime() {
+            const now = new Date();
+            const dateParams = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const timeParams = { hour: '2-digit', minute: '2-digit', hour12: true };
+            
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', dateParams);
+            document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', timeParams);
+        }
+        
+        setInterval(updateDateTime, 1000);
+        updateDateTime(); // init
+    </script>
+</body>
+</html>
