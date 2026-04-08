@@ -5,8 +5,8 @@
     justify-content: space-between;
     align-items: flex-start;
     padding: 0 1rem;
-    margin-top: -0.2rem;
-    /* Move the header layer a little down as requested */
+    margin-top: 2rem;
+    position: relative;
     z-index: 10;
     gap: 2rem;
 }
@@ -54,7 +54,7 @@
     flex-direction: column;
     align-items: center;
     position: absolute;
-    top: -0.5rem;
+    top: -4rem;
     left: 50%;
     transform: translateX(-50%);
 }
@@ -68,6 +68,109 @@
     transform-origin: top center;
 }
 
+.logo-sign.title-mode {
+    position: relative;
+    /* anchor positioning */
+    top: 0.5rem;
+    /* vertical alignment */
+    left: 10rem;
+    /* push it slightly from the left edge */
+    margin-left: 0;
+    /* ensure no auto-centering */
+    text-align: left;
+    /* align text/logo to the left */
+    z-index: 10;
+    /* keep above background overlay */
+}
+
+
+.title-image-header {
+    display: block;
+    margin-left: 0;
+    /* remove centering */
+    margin-right: auto;
+    /* push it left */
+    width: 250px;
+    max-width: 50vw;
+    height: auto;
+    filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.4));
+    position: relative;
+    z-index: 10;
+}
+
+
+
+/* Right Side Header Elements */
+.header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+.header-top-right {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+/* Date Time Box */
+.date-time-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    /* spread items evenly */
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    /* Safari support */
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    padding: 8px 20px;
+    border-radius: 50px;
+    color: #333;
+    font-weight: 700;
+    font-family: sans-serif;
+    font-size: 1rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    position: relative;
+    /* ensure layering works */
+    z-index: 10;
+    /* keep above background overlay */
+}
+
+.date-time-box i {
+    color: #333;
+    font-size: 1.1rem;
+    background: white;
+    padding: 6px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.divider {
+    width: 2px;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+/* Language button */
+.language-btn {
+    background: transparent;
+    border: none;
+    font-weight: 700;
+    cursor: pointer;
+    color: #333;
+    padding: 4px 10px;
+    border-radius: 20px;
+    transition: background 0.2s ease;
+}
+
+.language-btn:hover {
+    background: rgba(255, 255, 255, 0.6);
+}
 
 /* Language Selector */
 .language-selector {
@@ -76,14 +179,14 @@
 }
 
 .lang-btn {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.4);
     backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     padding: 8px 20px;
     border-radius: 50px;
-    color: white;
+    color: #333;
     font-size: 1.1rem;
-    font-weight: 500;
+    font-weight: 700;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -96,14 +199,15 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    background: rgba(255, 255, 255, 0.2);
+    background: white;
     padding: 4px 8px;
     border-radius: 50%;
     font-size: 0.9rem;
+    color: #333;
 }
 
 .lang-btn:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.6);
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
@@ -151,30 +255,31 @@
     border-radius: 0 0 12px 12px;
 }
 
-/* Date Time Box */
-.date-time-box {
+
+/* Talk to Waiter Button */
+.talk-waiter-btn-container {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.talk-waiter-btn {
+    background: #1a7a3b;
+    border: 2px solid white;
+    color: white;
+    padding: 6px 18px;
+    border-radius: 30px;
+    font-weight: 700;
+    font-size: 0.9rem;
     display: flex;
     align-items: center;
-    gap: 12px;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--glass-border);
-    padding: 12px 20px;
-    border-radius: 12px;
-    color: white;
-    font-family: sans-serif;
-    font-size: 0.9rem;
+    gap: 8px;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s;
 }
 
-.date-time-box i {
-    color: var(--primary-orange);
-    font-size: 1rem;
-}
-
-.divider {
-    width: 1px;
-    height: 20px;
-    background: rgba(255, 255, 255, 0.3);
+.talk-waiter-btn:hover {
+    transform: scale(1.05);
 }
 
 /* Footer Styles */

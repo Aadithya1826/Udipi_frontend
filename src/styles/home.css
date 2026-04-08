@@ -9,7 +9,7 @@
     text-align: center;
     z-index: 5;
     animation: fadeIn 0.6s ease-in;
-    margin-top: 3rem;
+    margin-top: 5rem; /* account for fixed header */
 }
 
 @keyframes fadeIn {

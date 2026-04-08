@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import '../styles/components.css'
 
-function Header({ tableNumber = '06', showFullHeader = false }) {
+function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = false }) {
   const [currentLang, setCurrentLang] = useState('English')
   const [showLangDropdown, setShowLangDropdown] = useState(false)
   const [currentDate, setCurrentDate] = useState('')
@@ -39,47 +39,65 @@ function Header({ tableNumber = '06', showFullHeader = false }) {
       </div>
 
       {/* Logo Sign */}
-      <div className="logo-sign">
-        <img src="/udupi-banner.png" alt="Data Udipi Logo" className="banner-image" />
+      <div className={`logo-sign ${useTitleImage ? 'title-mode' : ''}`}>
+        <img 
+          src={useTitleImage ? "/Dataudupi-Title.png" : "/udupi-banner.png"} 
+          alt="Data Udipi Logo" 
+          className={useTitleImage ? "title-image-header" : "banner-image"} 
+        />
       </div>
 
-      {/* Language Selector */}
-      <div className="language-selector">
-        <button 
-          className="lang-btn"
-          onClick={() => setShowLangDropdown(!showLangDropdown)}
-        >
-          <span className="lang-icon">A<i className="fa-solid fa-arrow-right-arrow-left"></i></span> 
-          <span>Languages</span>
-        </button>
-        {showLangDropdown && (
-          <div className="lang-dropdown show">
-            <div 
-              className="lang-option" 
-              onClick={() => { setCurrentLang('English'); setShowLangDropdown(false); }}
-            >
-              English
+      {/* Right Side Elements */}
+      <div className="header-right">
+        <div className="header-top-right">
+          {/* Date-Time (for full header) */}
+          {showFullHeader && (
+            <div className="date-time-box">
+              <i className="fa-regular fa-calendar"></i>
+              <span>{currentDate}</span>
+              <div className="divider"></div>
+              <i className="fa-regular fa-clock"></i>
+              <span>{currentTime}</span>
             </div>
-            <div 
-              className="lang-option"
-              onClick={() => { setCurrentLang('Tamil'); setShowLangDropdown(false); }}
+          )}
+
+          {/* Language Selector */}
+          <div className="language-selector">
+            <button 
+              className="lang-btn"
+              onClick={() => setShowLangDropdown(!showLangDropdown)}
             >
-              Tamil
-            </div>
+              <span className="lang-icon">A<i className="fa-solid fa-arrow-right-arrow-left"></i></span> 
+              <span>Languages</span>
+            </button>
+            {showLangDropdown && (
+              <div className="lang-dropdown show">
+                <div 
+                  className="lang-option" 
+                  onClick={() => { setCurrentLang('English'); setShowLangDropdown(false); }}
+                >
+                  English
+                </div>
+                <div 
+                  className="lang-option"
+                  onClick={() => { setCurrentLang('Tamil'); setShowLangDropdown(false); }}
+                >
+                  Tamil
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Talk to Waiter (for full header) */}
+        {showFullHeader && (
+          <div className="talk-waiter-btn-container">
+            <button className="talk-waiter-btn">
+              <i className="fa-solid fa-headset"></i> Talk To Your Waiter
+            </button>
           </div>
         )}
       </div>
-
-      {/* Date-Time (for full header) */}
-      {showFullHeader && (
-        <div className="date-time-box">
-          <i className="fa-regular fa-calendar"></i>
-          <span>{currentDate}</span>
-          <div className="divider"></div>
-          <i className="fa-regular fa-clock"></i>
-          <span>{currentTime}</span>
-        </div>
-      )}
     </header>
   )
 }
