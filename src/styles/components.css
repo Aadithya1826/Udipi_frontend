@@ -208,11 +208,11 @@
 }
 
 .chef-mascot {
-    width: 450px;
-    max-width: 60vw;
+    width: 520px;
+    max-width: 70vw;
     height: auto;
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
-    margin-bottom: -15px;
+    filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
+    margin-bottom: -10px;
     z-index: 5;
 }
 

@@ -17,7 +17,7 @@ function Home() {
       <main className="main-content">
         <h2 className="welcome-text">Welcome To</h2>
         <div className="main-title">
-          <img src="/Dataudupi Title.png" alt="Data Udipi" className="title-image" />
+          <img src="/Dataudupi-Title.png" alt="Data Udipi" className="title-image" />
         </div>
         <p className="subtitle">40 YEARS OF EXCELLENCE IN SOUTH INDIAN VEGETARIAN CUISINE</p>
 

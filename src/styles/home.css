@@ -1,15 +1,18 @@
 /* Home Page Styles */
 .main-content {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.2rem;
+    gap: 1.2rem;
     flex: 1;
     text-align: center;
     z-index: 5;
     animation: fadeIn 0.6s ease-in;
-    margin-top: 3rem;
+    padding: 6rem 1rem 2rem;
+    max-width: 1200px;
+    width: 100%;
 }
 
 @keyframes fadeIn {
@@ -25,35 +28,37 @@
 }
 
 .welcome-text {
-    font-size: 2rem;
+    display: inline-block;
+    font-size: clamp(2rem, 2.5vw, 2.6rem);
     font-weight: 300;
     color: #fff;
-    margin-bottom: -5px;
-    text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.5);
+    margin: 0 auto -5px;
+    text-shadow: 2px 2px 12px rgba(0, 0, 0, 0.6);
+    letter-spacing: 1px;
 }
 
 .main-title {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 10px 0;
+    margin: 0.75rem 0 0.5rem;
 }
 
 .title-image {
-    width: 600px;
-    max-width: 90vw;
+    width: 640px;
+    max-width: 88vw;
     height: auto;
-    filter: drop-shadow(0 10px 15px rgba(0, 0, 0, 0.4));
+    filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.45));
 }
 
 .subtitle {
-    font-size: 1.1rem;
+    font-size: clamp(1rem, 1.2vw, 1.2rem);
     font-weight: 700;
     letter-spacing: 2.5px;
     color: #fff;
     text-transform: uppercase;
-    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.5);
-    margin-top: 10px;
+    text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.55);
+    margin-top: 0.8rem;
 }
 
 .order-section {
@@ -61,19 +66,19 @@
     flex-direction: column;
     align-items: center;
     gap: 1.5rem;
-    margin-top: 1rem;
+    margin-top: 1.5rem;
 }
 
 .order-text {
-    font-size: 1.5rem;
-    font-weight: 600;
+    font-size: clamp(1.4rem, 2vw, 1.7rem);
+    font-weight: 700;
     color: var(--text-light);
     letter-spacing: 1px;
 }
 
 .action-buttons {
     display: flex;
-    gap: 2rem;
+    gap: 1.5rem;
     justify-content: center;
     flex-wrap: wrap;
     padding: 0 1rem;
@@ -83,35 +88,22 @@
     background: linear-gradient(135deg, #ff4e00 0%, #ec1c24 100%);
     border: none;
     color: white;
-
-    padding: 14px 28px;
-    /* reduced size */
+    width: 210px;
+    min-height: 125px;
+    padding: 14px 20px;
     border-radius: 999px;
-    /* full pill shape */
-
-    font-size: 1rem;
-    /* slightly smaller text */
-    font-weight: 600;
-
+    font-size: 1.2rem;
+    font-weight: 700;
     cursor: pointer;
-
     display: flex;
-    flex-direction: row;
-    /* changed from column → row */
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    /* space between icon & text */
-
+    gap: 12px;
     transition: all 0.3s ease;
-    /* smoother animation */
-    box-shadow: 0 6px 15px rgba(236, 28, 36, 0.35);
-
-    min-width: auto;
-    /* removed large width */
-    white-space: nowrap;
-    /* prevent text breaking */
-
+    box-shadow: 0 12px 28px rgba(236, 28, 36, 0.25);
+    white-space: normal;
+    text-align: center;
     font-family: 'Outfit', sans-serif;
 }
 
@@ -120,20 +112,21 @@
 }
 
 .btn-icon-img {
-    height: 3.5rem;
+    height: 3.2rem;
     width: auto;
     object-fit: contain;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.25));
 }
 
 .action-btn:hover {
-    transform: translateY(-8px) scale(1.05);
-    box-shadow: 0 15px 35px rgba(236, 28, 36, 0.6);
+    transform: translateY(-6px) scale(1.03);
+    box-shadow: 0 18px 40px rgba(236, 28, 36, 0.35);
 }
 
 .action-btn:active {
     transform: translateY(-2px) scale(0.98);
 }
+
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -165,5 +158,43 @@
 
     .action-btn i {
         font-size: 1.2rem;
+    }
+}
+
+/* Mobile Responsive Overrides */
+@media (max-width: 768px) {
+    .main-content {
+        padding: 4rem 1rem 1.5rem;
+    }
+
+    .main-title {
+        margin: 1rem 0 0.5rem;
+    }
+
+    .welcome-text {
+        font-size: 2.2rem;
+    }
+
+    .subtitle {
+        font-size: 0.95rem;
+    }
+
+    .order-text {
+        font-size: 1.2rem;
+    }
+
+    .action-buttons {
+        gap: 1rem;
+    }
+
+    .action-btn {
+        width: 140px;
+        min-height: 130px;
+        padding: 14px 16px;
+        font-size: 0.95rem;
+    }
+
+    .btn-icon-img {
+        height: 2.6rem;
     }
 }
