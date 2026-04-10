@@ -10,7 +10,7 @@
     text-align: center;
     z-index: 5;
     animation: fadeIn 0.6s ease-in;
-    padding: 6rem 1rem 2rem;
+    padding: clamp(2rem, 5vw, 6rem) 1rem 2rem;
     max-width: 1200px;
     width: 100%;
 }
@@ -88,8 +88,7 @@
     background: linear-gradient(135deg, #ff4e00 0%, #ec1c24 100%);
     border: none;
     color: white;
-    width: 210px;
-    min-height: 125px;
+    width: min(210px, 40vw);
     padding: 14px 20px;
     border-radius: 999px;
     font-size: 1.2rem;

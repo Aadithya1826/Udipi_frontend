@@ -208,7 +208,7 @@
 }
 
 .chef-mascot {
-    width: 520px;
+    width: min(520px, 80vw);
     max-width: 70vw;
     height: auto;
     filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
