@@ -18,7 +18,7 @@
 
 html, body, #root {
     width: 100%;
-    height: 100%;
+    min-height: 100%;
     margin: 0;
     padding: 0;
 }
@@ -26,19 +26,21 @@ html, body, #root {
 body {
     font-family: 'Times New Roman', Times, serif;
     color: var(--text-light);
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     background-color: #000;
 }
 
 .app-container {
     position: relative;
     width: 100%;
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    padding: 2rem;
+    justify-content: center;
+    gap: 2rem;
+    padding: 2rem 1.5rem;
 }
 
 /* Background */
@@ -50,8 +52,8 @@ body {
     height: 100%;
     background: url('/restaurant_bg.png') no-repeat center center/cover;
     z-index: -2;
-    filter: blur(12px);
-    transform: scale(1.1);
+    filter: brightness(1.15) blur(10px);
+    transform: none;
 }
 
 .background-image::after {
@@ -61,6 +63,6 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.5), rgba(0,0,0,0.8));
+    background: linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.65));
     z-index: -1;
 }
