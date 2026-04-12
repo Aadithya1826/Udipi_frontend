@@ -1,16 +1,61 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
 import '../styles/pages.css'
 
+const takeawayPackages = [
+  { 
+    id: 1, 
+    name: 'Breakfast Box', 
+    description: 'Idly, Vada, Pongal with Sambar & Chutney',
+    items: 3, 
+    price: 120,
+    image: '/cat-breakfast.png'
+  },
+  { 
+    id: 2, 
+    name: 'Dosa Combo', 
+    description: 'Masala Dosa, Rava Dosa with sides',
+    items: 4, 
+    price: 160,
+    image: '/cat-dosa.png'
+  },
+  { 
+    id: 3, 
+    name: 'Lunch Thali', 
+    description: 'Full meals with rice, sambar, rasam & more',
+    items: 6, 
+    price: 130,
+    image: '/cat-lunch.png'
+  },
+  { 
+    id: 4, 
+    name: 'North Indian Combo', 
+    description: 'Nan, Paneer Butter Masala & Pulav',
+    items: 3, 
+    price: 250,
+    image: '/cat-northindian.png'
+  },
+  { 
+    id: 5, 
+    name: 'Snack Pack', 
+    description: 'Bajji, Bonda, Chola Poori & Tea',
+    items: 4, 
+    price: 180,
+    image: '/cat-snacks.png'
+  },
+  { 
+    id: 6, 
+    name: 'Party Feast', 
+    description: 'Biryani, Noodles, Gobi 65 & more',
+    items: 8, 
+    price: 499,
+    image: '/cat-rice.png'
+  },
+]
+
 function TakeAway() {
   const navigate = useNavigate()
-
-  const packages = [
-    { id: 1, name: 'Breakfast Box', items: 3, price: 450 },
-    { id: 2, name: 'Lunch Combo', items: 4, price: 699 },
-    { id: 3, name: 'Premium Feast', items: 6, price: 999 },
-  ]
 
   return (
     <div className="app-container">
@@ -24,13 +69,22 @@ function TakeAway() {
           <p>Order for takeaway and enjoy at home</p>
         </div>
 
-        <div className="packages-grid">
-          {packages.map(pkg => (
-            <div key={pkg.id} className="package-card">
-              <h3>{pkg.name}</h3>
-              <p className="items-count">{pkg.items} Items</p>
-              <p className="price">₹{pkg.price}</p>
-              <button className="order-btn">Order Now</button>
+        <div className="takeaway-grid">
+          {takeawayPackages.map(pkg => (
+            <div key={pkg.id} className="takeaway-card">
+              <div className="takeaway-card-img">
+                <img src={pkg.image} alt={pkg.name} />
+                <div className="takeaway-card-overlay"></div>
+                <span className="takeaway-items-badge">{pkg.items} Items</span>
+              </div>
+              <div className="takeaway-card-body">
+                <h3>{pkg.name}</h3>
+                <p className="takeaway-desc">{pkg.description}</p>
+                <div className="takeaway-card-footer">
+                  <span className="takeaway-price">₹{pkg.price}</span>
+                  <button className="order-btn">Order Now</button>
+                </div>
+              </div>
             </div>
           ))}
         </div>

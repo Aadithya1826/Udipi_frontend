@@ -10,13 +10,13 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
   useEffect(() => {
     const updateDateTime = () => {
       const now = new Date()
-      const dateStr = now.toLocaleDateString('en-US', { 
-        weekday: 'long', 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
+      const dateStr = now.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
       })
-      const timeStr = now.toLocaleTimeString('en-US', { 
+      const timeStr = now.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
         hour12: true
@@ -40,10 +40,10 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
 
       {/* Logo Sign */}
       <div className={`logo-sign ${useTitleImage ? 'title-mode' : ''}`}>
-        <img 
-          src={useTitleImage ? "/Dataudupi-Title.png" : "/udupi-banner.png"} 
-          alt="Data Udipi Logo" 
-          className={useTitleImage ? "title-image-header" : "banner-image"} 
+        <img
+          src={useTitleImage ? "/Dataudupi-Title.png" : "/udupi-banner.png"}
+          alt="Data Udipi Logo"
+          className={useTitleImage ? "title-image-header" : "banner-image"}
         />
       </div>
 
@@ -63,22 +63,22 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
 
           {/* Language Selector */}
           <div className="language-selector">
-            <button 
+            <button
               className="lang-btn"
               onClick={() => setShowLangDropdown(!showLangDropdown)}
             >
-              <span className="lang-icon">A<i className="fa-solid fa-arrow-right-arrow-left"></i></span> 
+              <span className="lang-icon">A<i className="fa-solid fa-arrow-right-arrow-left"></i></span>
               <span>Languages</span>
             </button>
             {showLangDropdown && (
               <div className="lang-dropdown show">
-                <div 
-                  className="lang-option" 
+                <div
+                  className="lang-option"
                   onClick={() => { setCurrentLang('English'); setShowLangDropdown(false); }}
                 >
                   English
                 </div>
-                <div 
+                <div
                   className="lang-option"
                   onClick={() => { setCurrentLang('Tamil'); setShowLangDropdown(false); }}
                 >
@@ -88,7 +88,7 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
             )}
           </div>
         </div>
-        
+
         {/* Talk to Waiter (for full header) */}
         {showFullHeader && (
           <div className="talk-waiter-btn-container">

@@ -16,7 +16,9 @@
     box-sizing: border-box;
 }
 
-html, body, #root {
+html,
+body,
+#root {
     width: 100%;
     min-height: 100%;
     margin: 0;
@@ -25,7 +27,7 @@ html, body, #root {
 
 body {
     font-family: 'Times New Roman', Times, serif;
-    color: var(--text-light);
+    color: #090707;
     overflow-y: auto;
     background-color: #000;
 }
@@ -61,6 +63,6 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.5), rgba(0,0,0,0.8));
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.8));
     z-index: -1;
 }
