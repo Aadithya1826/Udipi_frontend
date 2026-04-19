@@ -423,14 +423,8 @@ function Agent() {
     setIsLoading(true)
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY?.trim()
-      const apiModel = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-flash'
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`
-
-      if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
-        console.error("VITE_GEMINI_API_KEY is missing or using placeholder in .env")
-        throw new Error("API Key not found. Please check your .env file.")
-      }
+      // Calling our internal backend proxy instead of Google directly
+      const apiUrl = '/api/chat'
 
       const apiMessages = updatedMessages
         .filter(msg => msg.content && typeof msg.content === 'string')
@@ -440,8 +434,6 @@ function Agent() {
         }));
 
       // Gemini requires the conversation to end with a 'user' message
-      // If our filter removed the user message or it shifted the order,
-      // we ensure the last one is always the user's current text.
       if (apiMessages.length === 0 || apiMessages[apiMessages.length - 1].role === 'model') {
         apiMessages.push({
           role: 'user',
@@ -467,7 +459,7 @@ function Agent() {
       const data = await response.json()
 
       if (!response.ok) {
-        console.error("Gemini API error:", data)
+        console.error("Chat API error:", data)
         throw new Error(data.error?.message || `API Error: ${response.status}`)
       }
 
