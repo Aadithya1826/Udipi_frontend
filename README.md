@@ -1,100 +1,78 @@
 # Data Udipi Restaurant - React Frontend
 
-A modern, responsive React.js frontend for the Data Udipi restaurant ordering system.
+A modern, responsive React.js frontend for the Data Udipi restaurant ordering system, featuring glass-morphism design, AI-powered agent interaction, and a seamless ordering experience.
 
-## Project Structure
+## 🚀 Quick Start
 
-```
-Restaurant APP/
-├── public/                  # Static assets
-│   ├── chef_mascot.jpeg
-│   └── restaurant_bg.png
-├── src/                     # Source code
-│   ├── components/          # Reusable components
-│   │   ├── Header.jsx
-│   │   └── Footer.jsx
-│   ├── pages/               # Page components
-│   │   ├── Home.jsx
-│   │   ├── Agent.jsx
-│   │   ├── DineIn.jsx
-│   │   └── TakeAway.jsx
-│   ├── styles/              # CSS files
-│   │   ├── globals.css      # Global styles
-│   │   ├── components.css   # Component styles
-│   │   ├── home.css         # Home page styles
-│   │   └── pages.css        # Pages styles
-│   ├── App.jsx              # Root component
-│   └── main.jsx             # Entry point
-├── .eslintrc.json           # ESLint configuration
-├── .gitignore               # Git ignore rules
-├── index.html               # HTML entry point
-├── vite.config.js           # Vite configuration
-├── package.json             # Dependencies
-├── README.md                # This file
-└── SETUP.md                 # Setup instructions
-```
+### Prerequisites
+- **Node.js**: v18 or higher
+- **npm**: v8 or higher
 
-## Installation
+### Installation
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Set up environment variables:
+   - Create a `.env` file based on `.env.example`
+   - Add your `VITE_GEMINI_API_KEY` and other configurations.
 
-1. Install dependencies:
-```bash
-npm install
-```
-
-2. Ensure your image assets are in the `public/` folder:
-   - `chef_mascot.jpeg` - The chef mascot image
-   - `restaurant_bg.png` - Background image
-
-## Development
-
+### Development
 Start the development server:
 ```bash
 npm run dev
 ```
+The app will be available at `http://localhost:3000`.
 
-The app will open at `http://localhost:3000`
+## 📁 Project Structure
 
-## Building
-
-Create a production build:
-```bash
-npm run build
+```text
+Restaurant APP/
+├── public/                  # Static assets (images, fonts)
+├── src/                     # Source code
+│   ├── components/          # Reusable UI components (Header, Footer, Modals)
+│   ├── data/                # Static data & configuration
+│   ├── pages/               # Page-level components (Home, Agent, DineIn, TakeAway)
+│   ├── styles/              # CSS styles (Globals, Components, Pages)
+│   ├── App.jsx              # Main router and app layout
+│   └── main.jsx             # React entry point
+├── azure-pipelines.yml      # Azure DevOps deployment configuration
+├── Dockerfile               # Containerization configuration
+├── nginx.conf               # Nginx configuration for SPA routing
+├── vite.config.js           # Vite build configuration
+└── package.json             # Project dependencies and scripts
 ```
 
-## Features
+## 🛠️ Technologies Used
+- **React 18.2**: UI logic and framework.
+- **Vite**: Ultra-fast build tool and development server.
+- **React Router 6**: Client-side navigation.
+- **CSS3**: Modern styling with animations and glass-morphism.
+- **Font Awesome**: Icon system.
 
-- **Home Page**: Welcome screen with ordering options
-- **Talk to Agent**: Chat interface for customer support
-- **Dine In**: Browse menu and place dine-in orders
-- **Take Away**: View takeaway packages
-- **Language Support**: English and Tamil language selector
-- **Responsive Design**: Works on desktop, tablet, and mobile
-- **Chef Mascot**: Animated mascot with bounce effect
-- **Modern UI**: Glass-morphism design with smooth animations
+## 📦 Deployment
 
-## Technologies Used
+### Azure DevOps (CI/CD)
+The project includes an `azure-pipelines.yml` file. When connected to Azure DevOps, it will automatically:
+1. Install dependencies.
+2. Build the production application.
+3. Publish the `dist` folder as a build artifact.
 
-- **React 18.2** - UI framework
-- **React Router 6** - Client-side routing
-- **Vite** - Fast build tool
-- **CSS3** - Modern styling with animations
-- **Font Awesome** - Icons
+### Docker (Containerization)
+To build and run the application as a container:
+```bash
+docker build -t udipi-frontend .
+docker run -p 80:80 udipi-frontend
+```
+This uses a multi-stage build and Nginx to serve the content efficiently.
 
-## Styling Features
+## ✨ Features
+- **AI Agent**: Interactive chat interface for customer assistance.
+- **Dine-In Menu**: Visual menu browsing with item details and categories.
+- **Takeaway Packages**: Pre-configured meal packages for quick selection.
+- **Multilingual Support**: Toggle between English and Tamil.
+- **Responsive Design**: Optimized for desktop, tablet, and mobile browsers.
 
-- Glass-morphism effects
-- Smooth animations and transitions
-- Dark theme with orange and green accents
-- Mobile-responsive grid layouts
-- Custom scrollbars
-- Glassmorphic buttons and components
-
-## Chef Mascot Integration
-
-The chef mascot image is displayed in the footer with:
-- Bounce animation
-- Drop shadow effect
-- Responsive sizing
-- Positioned above the "Deliciously Vegetarian" slogan
-
-Make sure the `chef_mascot.jpeg` file is placed in the `public/` folder for proper display.
+## 📜 License
+Data Udipi Restaurant Application. All rights reserved.
