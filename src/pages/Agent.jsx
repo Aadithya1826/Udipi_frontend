@@ -24,7 +24,7 @@ function Agent() {
     }
   }
   const menuCategories = [
-    { id: 'all', name: 'All Menu', image: 'https://api.builder.io/api/v1/image/assets/TEMP/b7f61cea92a021e054d08237df9cdd97ba3983dd?width=60' },
+    { id: 'all', name: 'All Menu', image: '/all menu.png' },
     { id: 'breakfast', name: 'Breakfast', image: 'https://api.builder.io/api/v1/image/assets/TEMP/1820b89024cc5339a94c47a80adb10aba6f8042d?width=56' },
     { id: 'lunch', name: 'Lunch', image: 'https://api.builder.io/api/v1/image/assets/TEMP/9a0ee0aa828487dab39d472d95da26cf07415c74?width=60' },
     { id: 'dinner', name: 'Dinner', image: 'https://api.builder.io/api/v1/image/assets/TEMP/9a0ee0aa828487dab39d472d95da26cf07415c74?width=60' },

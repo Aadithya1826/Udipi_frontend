@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
+import MenuItemModal from '../components/MenuItemModal'
 import '../styles/pages.css'
 
 const allMenuData = {
@@ -255,9 +256,29 @@ const northIndianCats = ['Salads', 'Tandoori Breads', 'Tandoori Sides', 'Starter
 function DineIn() {
   const navigate = useNavigate()
   const [activeCategory, setActiveCategory] = useState(categories[0])
+  const [selectedItem, setSelectedItem] = useState(null)
+  const [showModal, setShowModal] = useState(false)
 
   const currentItems = allMenuData[activeCategory] || []
   const isNorthIndian = northIndianCats.includes(activeCategory)
+
+  const handleItemClick = (item) => {
+    setSelectedItem(item)
+    setShowModal(true)
+  }
+
+  const handleCloseModal = () => {
+    setShowModal(false)
+    setSelectedItem(null)
+  }
+
+  const handleAddToCart = (cartItem) => {
+    console.log('Added to cart:', cartItem)
+    // TODO: Implement add to cart functionality
+    // You can dispatch action to cart context or state management here
+    alert(`${cartItem.item.item} x${cartItem.quantity} added to cart!`)
+    handleCloseModal()
+  }
 
   return (
     <div className="app-container">
@@ -310,7 +331,7 @@ function DineIn() {
 
         <div className="dinein-items-list">
           {currentItems.map((menuItem, idx) => (
-            <div key={idx} className="dinein-item-row">
+            <div key={idx} className="dinein-item-row" onClick={() => handleItemClick(menuItem)}>
               <div className="dinein-item-info">
                 <span className="dinein-item-name">{menuItem.item}</span>
               </div>
@@ -321,6 +342,15 @@ function DineIn() {
             </div>
           ))}
         </div>
+
+        {showModal && selectedItem && (
+          <MenuItemModal 
+            item={selectedItem}
+            category={activeCategory}
+            onClose={handleCloseModal}
+            onAddToCart={handleAddToCart}
+          />
+        )}
 
         <button className="back-btn" onClick={() => navigate('/')}>
           <i className="fa-solid fa-arrow-left"></i> Back to Home

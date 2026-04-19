@@ -1083,6 +1083,7 @@
     padding: 14px 20px;
     transition: all 0.3s ease;
     animation: fadeIn 0.3s ease-out;
+    cursor: pointer;
 }
 
 .dinein-item-row:hover {
@@ -1395,6 +1396,7 @@
     overflow: hidden;
     transition: all 0.3s ease;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
 }
 
 .takeaway-card:hover {
@@ -1699,4 +1701,4 @@
   border-top: none;
   border-bottom-right-radius: 8px;
 }
-
+

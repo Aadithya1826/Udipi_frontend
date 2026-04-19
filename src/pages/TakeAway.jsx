@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
+import MenuItemModal from '../components/MenuItemModal'
 import '../styles/pages.css'
 
 const takeawayPackages = [
@@ -56,6 +57,25 @@ const takeawayPackages = [
 
 function TakeAway() {
   const navigate = useNavigate()
+  const [selectedItem, setSelectedItem] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+
+  const handleItemClick = (item) => {
+    setSelectedItem(item)
+    setShowModal(true)
+  }
+
+  const handleCloseModal = () => {
+    setShowModal(false)
+    setSelectedItem(null)
+  }
+
+  const handleAddToCart = (cartItem) => {
+    console.log('Added to cart:', cartItem)
+    // TODO: Implement add to cart functionality
+    alert(`${cartItem.item.name} x${cartItem.quantity} added to cart!`)
+    handleCloseModal()
+  }
 
   return (
     <div className="app-container">
@@ -71,7 +91,7 @@ function TakeAway() {
 
         <div className="takeaway-grid">
           {takeawayPackages.map(pkg => (
-            <div key={pkg.id} className="takeaway-card">
+            <div key={pkg.id} className="takeaway-card" onClick={() => handleItemClick(pkg)}>
               <div className="takeaway-card-img">
                 <img src={pkg.image} alt={pkg.name} />
                 <div className="takeaway-card-overlay"></div>
@@ -82,12 +102,21 @@ function TakeAway() {
                 <p className="takeaway-desc">{pkg.description}</p>
                 <div className="takeaway-card-footer">
                   <span className="takeaway-price">₹{pkg.price}</span>
-                  <button className="order-btn">Order Now</button>
+                  <button className="order-btn" onClick={(e) => e.stopPropagation()}>Order Now</button>
                 </div>
               </div>
             </div>
           ))}
         </div>
+
+        {showModal && selectedItem && (
+          <MenuItemModal 
+            item={{item: selectedItem.name, price: selectedItem.price, description: selectedItem.description}}
+            category="Take Away"
+            onClose={handleCloseModal}
+            onAddToCart={handleAddToCart}
+          />
+        )}
 
         <button className="back-btn" onClick={() => navigate('/')}>
           <i className="fa-solid fa-arrow-left"></i> Back to Home
