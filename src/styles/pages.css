@@ -184,8 +184,9 @@
     width: 100%;
     max-width: 1600px;
     /* Extended width */
-    height: 100vh;
-    padding: 2rem 1.5rem 0;
+    height: auto;
+    min-height: 0;
+    padding: 1rem 0 0;
     /* Minimal padding */
     z-index: 5;
     animation: fadeIn 0.6s ease-in;
@@ -293,8 +294,10 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    height: calc(100vh - 120px);
-    /* Taller chatbot */
+    flex: 1;
+    height: auto;
+    min-height: 0;
+    /* Fluid chatbot */
     box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.3);
     position: relative;
     margin-top: auto;
@@ -454,6 +457,22 @@
 .mic-btn:hover {
     transform: scale(1.1);
     box-shadow: 0 0 15px rgba(255, 78, 0, 0.5);
+}
+
+.pulse-anim {
+    animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+@keyframes pulse-ring {
+    0% {
+        box-shadow: 0 0 0 0 rgba(236, 28, 36, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 15px rgba(236, 28, 36, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(236, 28, 36, 0);
+    }
 }
 
 .mute-btn {

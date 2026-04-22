@@ -1,31 +1,32 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useLanguage } from '../context/LanguageContext'
 import Header from '../components/Header'
 import MenuItemModal from '../components/MenuItemModal'
 import '../styles/pages.css'
 
 const allMenuData = {
   'Breakfast & Dinner': [
-    { item: 'Idly (2)', price: 40.00 },
-    { item: 'Sambar Idly (2)', price: 60.00 },
-    { item: 'Spl. Mini Sambar Idly', price: 65.00 },
-    { item: 'Vadai', price: 30.00 },
-    { item: 'Pongal', price: 70.00 },
-    { item: 'Sambar Vadai (1)', price: 40.00 },
-    { item: 'Curd Vadai (1)', price: 40.00 },
-    { item: 'Spl. Vada', price: 35.00 },
-    { item: 'Poori Masala', price: 80.00 },
-    { item: 'Special Soda Dosai', price: 70.00 },
-    { item: 'Special Masala Dosai', price: 80.00 },
-    { item: 'Rava Dosai', price: 85.00 },
-    { item: 'Idiyappam with Kurma', price: 70.00 },
-    { item: 'Podi Idly', price: 65.00 },
-    { item: 'Idly Vadacurry', price: 60.00 },
-    { item: 'Dosa Vadacurry', price: 80.00 },
-    { item: 'Poori Vadacurry', price: 90.00 },
-    { item: 'Idiyappam Vadacurry', price: 75.00 },
-    { item: 'Kuli Paniyaram', price: 60.00 },
-    { item: 'Appam (1)', price: 40.00 },
+    { item: 'Idly (2)', tamilItem: 'இட்லி (2)', price: 40.00 },
+    { item: 'Sambar Idly (2)', tamilItem: 'சாம்பார் இட்லி (2)', price: 60.00 },
+    { item: 'Spl. Mini Sambar Idly', tamilItem: 'சிறப்பு மினி சாம்பார் இட்லி', price: 65.00 },
+    { item: 'Vadai', tamilItem: 'வடை', price: 30.00 },
+    { item: 'Pongal', tamilItem: 'பொங்கல்', price: 70.00 },
+    { item: 'Sambar Vadai (1)', tamilItem: 'சாம்பார் வடை (1)', price: 40.00 },
+    { item: 'Curd Vadai (1)', tamilItem: 'தயிர் வடை (1)', price: 40.00 },
+    { item: 'Spl. Vada', tamilItem: 'சிறப்பு வடை', price: 35.00 },
+    { item: 'Poori Masala', tamilItem: 'பூரி மசாலா', price: 80.00 },
+    { item: 'Special Soda Dosai', tamilItem: 'சிறப்பு சோடா தோசை', price: 70.00 },
+    { item: 'Special Masala Dosai', tamilItem: 'சிறப்பு மசாலா தோசை', price: 80.00 },
+    { item: 'Rava Dosai', tamilItem: 'ரவா தோசை', price: 85.00 },
+    { item: 'Idiyappam with Kurma', tamilItem: 'இடியாப்பம் குருமாவுடன்', price: 70.00 },
+    { item: 'Podi Idly', tamilItem: 'பொடி இட்லி', price: 65.00 },
+    { item: 'Idly Vadacurry', tamilItem: 'இட்லி வடைகறி', price: 60.00 },
+    { item: 'Dosa Vadacurry', tamilItem: 'தோசை வடைகறி', price: 80.00 },
+    { item: 'Poori Vadacurry', tamilItem: 'பூரி வடைகறி', price: 90.00 },
+    { item: 'Idiyappam Vadacurry', tamilItem: 'இடியாப்பம் வடைகறி', price: 75.00 },
+    { item: 'Kuli Paniyaram', tamilItem: 'குழி பணியாரம்', price: 60.00 },
+    { item: 'Appam (1)', tamilItem: 'ஆப்பம் (1)', price: 40.00 },
   ],
   'B&D Specials': [
     { item: 'Gobi Mushroom Dosai', price: 135.00 },
@@ -255,6 +256,7 @@ const northIndianCats = ['Salads', 'Tandoori Breads', 'Tandoori Sides', 'Starter
 
 function DineIn() {
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const [activeCategory, setActiveCategory] = useState(categories[0])
   const [selectedItem, setSelectedItem] = useState(null)
   const [showModal, setShowModal] = useState(false)
@@ -288,12 +290,12 @@ function DineIn() {
 
       <main className="page-content">
         <div className="page-title-section">
-          <h1>Dine In</h1>
-          <p>Browse our menu and place your order</p>
+          <h1>{t('dineIn')}</h1>
+          <p>{t('browseMenu')}</p>
         </div>
 
         {/* South Indian Section */}
-        <div className="dinein-section-label">🍛 South Indian</div>
+        <div className="dinein-section-label">🍛 {t('southIndian')}</div>
         <div className="dinein-category-tabs">
           {southIndianCats.map(cat => (
             <button
@@ -302,13 +304,13 @@ function DineIn() {
               onClick={() => setActiveCategory(cat)}
             >
               <img src={categoryImages[cat]} alt={cat} className="dinein-tab-img" />
-              {cat}
+              {t(cat)}
             </button>
           ))}
         </div>
 
         {/* North Indian Section */}
-        <div className="dinein-section-label">🍲 North Indian</div>
+        <div className="dinein-section-label">🍲 {t('northIndian')}</div>
         <div className="dinein-category-tabs">
           {northIndianCats.map(cat => (
             <button
@@ -317,27 +319,29 @@ function DineIn() {
               onClick={() => setActiveCategory(cat)}
             >
               <img src={categoryImages[cat]} alt={cat} className="dinein-tab-img" />
-              {cat}
+              {t(cat)}
             </button>
           ))}
         </div>
 
         <div className="dinein-active-label">
-          {isNorthIndian && <span className="dinein-badge ni">North Indian</span>}
-          {!isNorthIndian && <span className="dinein-badge si">South Indian</span>}
-          <span className="dinein-badge-name">{activeCategory}</span>
-          <span className="dinein-badge-count">{currentItems.length} items</span>
+          {isNorthIndian && <span className="dinein-badge ni">{t('northIndian')}</span>}
+          {!isNorthIndian && <span className="dinein-badge si">{t('southIndian')}</span>}
+          <span className="dinein-badge-name">{t(activeCategory)}</span>
+          <span className="dinein-badge-count">{currentItems.length} {t('items')}</span>
         </div>
 
         <div className="dinein-items-list">
           {currentItems.map((menuItem, idx) => (
             <div key={idx} className="dinein-item-row" onClick={() => handleItemClick(menuItem)}>
               <div className="dinein-item-info">
-                <span className="dinein-item-name">{menuItem.item}</span>
+                <span className="dinein-item-name">
+                  {language === 'Tamil' && menuItem.tamilItem ? menuItem.tamilItem : menuItem.item}
+                </span>
               </div>
               <div className="dinein-item-price-area">
                 <span className="dinein-item-price">₹{menuItem.price.toFixed(0)}</span>
-                <button className="add-btn">Add</button>
+                <button className="add-btn">{t('add')}</button>
               </div>
             </div>
           ))}
@@ -345,15 +349,19 @@ function DineIn() {
 
         {showModal && selectedItem && (
           <MenuItemModal 
-            item={selectedItem}
-            category={activeCategory}
+            item={{
+              item: language === 'Tamil' && selectedItem.tamilItem ? selectedItem.tamilItem : selectedItem.item,
+              price: selectedItem.price,
+              description: language === 'Tamil' && selectedItem.tamilDescription ? selectedItem.tamilDescription : selectedItem.description
+            }}
+            category={t(activeCategory)}
             onClose={handleCloseModal}
             onAddToCart={handleAddToCart}
           />
         )}
 
         <button className="back-btn" onClick={() => navigate('/')}>
-          <i className="fa-solid fa-arrow-left"></i> Back to Home
+          <i className="fa-solid fa-arrow-left"></i> {t('backToHome')}
         </button>
       </main>
     </div>

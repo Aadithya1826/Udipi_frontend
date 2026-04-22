@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
+import { useLanguage } from '../context/LanguageContext'
 import '../styles/components.css'
 
 function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = false }) {
-  const [currentLang, setCurrentLang] = useState('English')
+  const { language, setLanguage, t } = useLanguage()
   const [showLangDropdown, setShowLangDropdown] = useState(false)
   const [currentDate, setCurrentDate] = useState('')
   const [currentTime, setCurrentTime] = useState('')
@@ -10,13 +11,13 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
   useEffect(() => {
     const updateDateTime = () => {
       const now = new Date()
-      const dateStr = now.toLocaleDateString('en-US', {
+      const dateStr = now.toLocaleDateString(language === 'English' ? 'en-US' : 'ta-IN', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric'
       })
-      const timeStr = now.toLocaleTimeString('en-US', {
+      const timeStr = now.toLocaleTimeString(language === 'English' ? 'en-US' : 'ta-IN', {
         hour: '2-digit',
         minute: '2-digit',
         hour12: true
@@ -28,13 +29,13 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
     updateDateTime()
     const interval = setInterval(updateDateTime, 1000)
     return () => clearInterval(interval)
-  }, [])
+  }, [language])
 
   return (
     <header className={`header ${showFullHeader ? 'full-header' : ''}`}>
       {/* Table Indicator */}
       <div className="table-indicator">
-        <span className="table-text">Table no :</span>
+        <span className="table-text">{t('tableNo')}</span>
         <div className="table-number">{tableNumber}</div>
       </div>
 
@@ -68,19 +69,19 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
               onClick={() => setShowLangDropdown(!showLangDropdown)}
             >
               <span className="lang-icon">A<i className="fa-solid fa-arrow-right-arrow-left"></i></span>
-              <span>Languages</span>
+              <span>{t('languages')}</span>
             </button>
             {showLangDropdown && (
               <div className="lang-dropdown show">
                 <div
                   className="lang-option"
-                  onClick={() => { setCurrentLang('English'); setShowLangDropdown(false); }}
+                  onClick={() => { setLanguage('English'); setShowLangDropdown(false); }}
                 >
                   English
                 </div>
                 <div
                   className="lang-option"
-                  onClick={() => { setCurrentLang('Tamil'); setShowLangDropdown(false); }}
+                  onClick={() => { setLanguage('Tamil'); setShowLangDropdown(false); }}
                 >
                   Tamil
                 </div>
@@ -93,7 +94,7 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
         {showFullHeader && (
           <div className="talk-waiter-btn-container">
             <button className="talk-waiter-btn">
-              <i className="fa-solid fa-headset"></i> Talk To Your Waiter
+              <i className="fa-solid fa-headset"></i> {t('talkWaiter')}
             </button>
           </div>
         )}

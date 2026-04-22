@@ -25,7 +25,7 @@ app.post('/api/chat', async (req, res) => {
         
         // Use GEMINI_API_KEY (WITHOUT VITE_ prefix to keep it safe on backend)
         const apiKey = process.env.GEMINI_API_KEY;
-        const apiModel = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+        const apiModel = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
 
         if (!apiKey) {

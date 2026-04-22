@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
+import { useLanguage } from '../context/LanguageContext'
 import '../styles/modal.css'
 
 function MenuItemModal({ item, category, onClose, onAddToCart }) {
+  const { t } = useLanguage()
   const [quantity, setQuantity] = useState(1)
 
   const handleAddToCart = () => {
@@ -23,7 +25,7 @@ function MenuItemModal({ item, category, onClose, onAddToCart }) {
 
         <div className="modal-header">
           <div className="item-status">
-            <span className="status-badge available">● Available</span>
+            <span className="status-badge available">● {t('available')}</span>
           </div>
         </div>
 
@@ -36,14 +38,14 @@ function MenuItemModal({ item, category, onClose, onAddToCart }) {
 
           {item.description && (
             <div className="modal-description">
-              <h4>Description</h4>
+              <h4>{t('description')}</h4>
               <p>{item.description}</p>
             </div>
           )}
 
           {item.ingredients && (
             <div className="modal-ingredients">
-              <h4>Ingredients</h4>
+              <h4>{t('ingredients')}</h4>
               <p>{item.ingredients}</p>
             </div>
           )}
@@ -53,7 +55,7 @@ function MenuItemModal({ item, category, onClose, onAddToCart }) {
           </div>
 
           <div className="modal-quantity">
-            <label>Quantity:</label>
+            <label>{t('quantity')}:</label>
             <div className="quantity-control">
               <button 
                 className="qty-btn"
@@ -78,7 +80,7 @@ function MenuItemModal({ item, category, onClose, onAddToCart }) {
 
           <div className="modal-footer">
             <button className="add-to-cart-btn" onClick={handleAddToCart}>
-              <i className="fa-solid fa-plus"></i> Add to Cart (₹{item.price * quantity})
+              <i className="fa-solid fa-plus"></i> {t('addToCart')} (₹{item.price * quantity})
             </button>
           </div>
         </div>

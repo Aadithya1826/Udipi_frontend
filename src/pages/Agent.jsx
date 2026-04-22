@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useLanguage } from '../context/LanguageContext'
 import Header from '../components/Header'
+import Invoice from './Invoice'
 import '../styles/pages.css'
-
-
 
 function Agent() {
   const navigate = useNavigate()
+  const { language, t } = useLanguage()
   const [messages, setMessages] = useState([
-    { role: 'model', content: "Hello! Welcome to Data Udipi. I'm your AI assistant. You can speak or tap to place your order. Would you like to start ordering?" }
+    { role: 'model', content: t('hello') }
   ])
   const [inputText, setInputText] = useState('')
   const [isListening, setIsListening] = useState(false)
@@ -23,6 +24,9 @@ function Agent() {
       window.speechSynthesis.cancel()
     }
   }
+
+  const menuTopRef = useRef(null)
+  const [micToast, setMicToast] = useState('')
   const menuCategories = [
     { id: 'all', name: 'All Menu', image: '/all menu.png' },
     { id: 'breakfast', name: 'Breakfast', image: 'https://api.builder.io/api/v1/image/assets/TEMP/1820b89024cc5339a94c47a80adb10aba6f8042d?width=56' },
@@ -278,7 +282,9 @@ function Agent() {
 
   // Checkout & Mobile Flow State
   const [isAwaitingMobile, setIsAwaitingMobile] = useState(false)
+  const [isAwaitingPayment, setIsAwaitingPayment] = useState(false)
   const [mobileNumber, setMobileNumber] = useState('')
+  const [finalInvoiceData, setFinalInvoiceData] = useState(null)
 
   const messagesEndRef = useRef(null)
 
@@ -288,8 +294,15 @@ function Agent() {
   }
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    if (showMenu && menuTopRef.current) {
+      // Scroll to the top of the menu instead of the bottom of the chat
+      setTimeout(() => {
+        menuTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } else {
+      scrollToBottom()
+    }
+  }, [messages, showMenu, activeCategory, viewMode])
 
   // Speech Recognition Setup
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -298,28 +311,34 @@ function Agent() {
   if (recognition) {
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.lang = 'en-US';
+    recognition.lang = language === 'English' ? 'en-US' : 'ta-IN';
 
     recognition.onstart = () => {
       setIsListening(true);
+      setMicToast(language === 'English' ? 'Listening...' : 'கேட்கிறது...');
     };
 
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
       setInputText(transcript);
+      setMicToast('Speech captured!');
       // Short delay to let user see their text before sending
       setTimeout(() => {
         handleSendMessage(transcript);
-      }, 500);
+        setMicToast('');
+      }, 800);
     };
 
     recognition.onerror = (event) => {
       console.error('Speech recognition error', event.error);
       setIsListening(false);
+      setMicToast('Mic error. Please try again.');
+      setTimeout(() => setMicToast(''), 2000);
     };
 
     recognition.onend = () => {
       setIsListening(false);
+      if (micToast === 'Listening...') setMicToast('');
     };
   }
 
@@ -338,7 +357,8 @@ function Agent() {
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    // Optional: tweak voice, rate, pitch
+    // Set language for voice synthesis
+    utterance.lang = language === 'English' ? 'en-US' : 'ta-IN';
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
 
@@ -363,15 +383,33 @@ function Agent() {
       return;
     }
 
+    if (isAwaitingPayment) {
+      if (lowerText === 'done' || lowerText.includes('done')) {
+        setIsAwaitingPayment(false);
+        
+        navigate('/invoice', { 
+          state: { 
+            cartData: finalInvoiceData?.cartData || [],
+            subtotal: finalInvoiceData?.subtotal || 0,
+            gst: finalInvoiceData?.gst || 0,
+            finalTotal: finalInvoiceData?.finalTotal || 0,
+            mobileNumber: mobileNumber
+          } 
+        });
+        return;
+      }
+    }
+
     if (isAwaitingMobile) {
       if (lowerText === 'done' || lowerText.includes('done')) {
         if (mobileNumber.length === 10 && /^[6-9]\d{9}$/.test(mobileNumber)) {
           setIsAwaitingMobile(false);
+          setIsAwaitingPayment(true);
           setMessages([{ role: 'model', type: 'qr_prompt' }]);
-          speakText("Scan the QR Code using your mobile. SCAN HERE TO PAY!");
+          speakText(`${t('qrPrompt')} ${t('scanToPay')} ${t('paymentComplete')}`);
         } else {
           setMessages([...messages, { role: 'user', content: textToSubmit }, { role: 'model', content: "Invalid mobile number" }]);
-          speakText("Invalid mobile number");
+          speakText(t('invalidMobile'));
         }
         setInputText('');
         return;
@@ -392,7 +430,7 @@ function Agent() {
       setIsAwaitingMobile(true);
       setMobileNumber('');
       setMessages([{ role: 'model', type: 'mobile_prompt' }]);
-      speakText("Enter your mobile number please... Say done after entering mobile number.");
+      speakText(`${t('enterMobile')} ${t('paymentComplete')}`);
       setInputText('');
       return;
     }
@@ -443,7 +481,7 @@ function Agent() {
 
       const payload = {
         systemInstruction: {
-          parts: [{ text: "You are a friendly and polite AI assistant for Data Udipi, a well-known authentic Indian vegetarian restaurant. Your role is to help customers explore the menu and place their orders smoothly. Always respond in a warm, courteous, and concise manner (1–2 sentences). You may suggest popular items such as Dosas, Idlis, Vadas, Meals, and Filter Coffee when relevant. If a customer asks to view the menu or available options, kindly inform them that you are showing the menu and include the token [SHOW_MENU] in your response." }]
+          parts: [{ text: `You are a friendly and polite AI assistant for Data Udipi, a well-known authentic Indian vegetarian restaurant. Your role is to help customers explore the menu and place their orders smoothly. Always respond in ${language}. Keep responses warm, courteous, and concise (1–2 sentences). You may suggest popular items such as Dosas, Idlis, Vadas, Meals, and Filter Coffee when relevant. If a customer asks to view the menu or available options, kindly inform them that you are showing the menu and include the token [SHOW_MENU] in your response.` }]
         },
         contents: apiMessages
       }
@@ -477,7 +515,7 @@ function Agent() {
         if (botResponse.toLowerCase().includes('review order') || botResponse.toLowerCase().includes('shall we proceed for checkout')) {
           setShowMenu(false)
           setMessages(prev => [...prev, { role: 'model', type: 'review' }])
-          speakText("Shall we proceed for checkout? Say just yes.")
+          speakText(t('proceedToPayment'))
           return;
         }
 
@@ -489,7 +527,7 @@ function Agent() {
       }
     } catch (error) {
       console.error("Detailed failure from Gemini:", error)
-      const customerFriendlyError = "I'm sorry, I'm having a bit of trouble connecting to the system. Please try asking again in a moment.";
+      const customerFriendlyError = language === 'English' ? "I'm sorry, I'm having a bit of trouble connecting to the system. Please try asking again in a moment." : "மன்னிக்கவும், கணினியுடன் இணைப்பதில் எனக்குச் சிறு சிக்கல் உள்ளது. தயவுசெய்து சிறிது நேரம் கழித்து மீண்டும் கேட்கவும்.";
       setMessages(prev => [...prev, { role: 'model', content: customerFriendlyError }])
       speakText(customerFriendlyError);
     } finally {
@@ -551,21 +589,27 @@ function Agent() {
     const gst = subtotal * 0.05;
     const finalTotal = subtotal + service + gst;
 
+    const checkoutData = {
+      cartData: [...cart],
+      subtotal,
+      service,
+      gst,
+      finalTotal
+    };
+
+    setFinalInvoiceData(checkoutData);
+
     setShowMenu(false);
     setMessages([
       {
         role: 'model',
         type: 'checkout',
-        cartData: [...cart],
-        subtotal,
-        service,
-        gst,
-        finalTotal
+        ...checkoutData
       }
     ]);
 
     setCart([]); // Clear cart after freezing data to message
-    speakText("Shall we proceed to Payment? Say just yes.");
+    speakText(t('proceedToPayment'));
   }
 
   const handleMobileDigit = (digit) => {
@@ -596,7 +640,7 @@ function Agent() {
 
                     {msg.type === 'review' ? (
                       <div className="review-card" style={{ margin: '0 10px', maxWidth: '420px', width: '100%' }}>
-                        <h3 className="title">Review Order</h3>
+                        <h3 className="title">{t('reviewOrder')}</h3>
 
                         <div className="review-card-items-list">
                           {cart.length === 0 ? (
@@ -628,13 +672,13 @@ function Agent() {
 
                         <button className="add-more" onClick={() => {
                           setShowMenu(true)
-                          setMessages(prev => [...prev, { role: 'model', content: "Certainly! Feel free to add more items from the menu." }])
-                        }}>+ ADD More</button>
+                          setMessages(prev => [...prev, { role: 'model', content: t('addMore') }])
+                        }}>{t('addMore')}</button>
 
                         {cart.length > 0 && (
                           <button className="checkout-btn" onClick={() => {
                             handleCheckout();
-                          }}>Confirm Order Checkout (Rs. {totalAmount})</button>
+                          }}>{t('confirmOrder')} (Rs. {totalAmount})</button>
                         )}
 
                         <p className="footer-text">
@@ -661,25 +705,25 @@ function Agent() {
                         </div>
 
                         <div className="co-bill">
-                          <div className="co-row"><span>Sub total</span><span id="subtotal">Rs. {msg.subtotal.toFixed(2)}</span></div>
-                          <div className="co-row"><span>Service Charge (5%)</span><span id="service">Rs. {msg.service.toFixed(2)}</span></div>
-                          <div className="co-row"><span>GST (5%)</span><span id="gst">Rs. {msg.gst.toFixed(2)}</span></div>
-                          <div className="co-row"><span>Service Charge (0)</span><span>Rs. 0.00</span></div>
+                          <div className="co-row"><span>{t('subtotal')}</span><span id="subtotal">Rs. {msg.subtotal.toFixed(2)}</span></div>
+                          <div className="co-row"><span>{t('serviceCharge')} (5%)</span><span id="service">Rs. {msg.service.toFixed(2)}</span></div>
+                          <div className="co-row"><span>{t('gst')} (5%)</span><span id="gst">Rs. {msg.gst.toFixed(2)}</span></div>
+                          <div className="co-row"><span>{t('serviceCharge')} (0)</span><span>Rs. 0.00</span></div>
 
                           <div className="co-divider"></div>
 
                           <div className="co-row co-total">
-                            <span>Total :</span>
+                            <span>{t('total')} :</span>
                             <span id="total">Rs. {msg.finalTotal.toFixed(2)}</span>
                           </div>
                         </div>
                         <p className="co-footer">
-                          Shall we proceed to Payment? Say just yes.
+                          {t('proceedToPayment')}
                         </p>
                       </div>
                     ) : msg.type === 'mobile_prompt' ? (
                       <div className="mobile-card" style={{ margin: '0 10px', maxWidth: '400px', width: '100%' }}>
-                        <p className="title">Enter your mobile number please.</p>
+                        <p className="title">{t('enterMobile')}</p>
 
                         <div className="display">
                           {mobileNumber.split("").join(" ")}
@@ -695,11 +739,11 @@ function Agent() {
                           <button onClick={handleMobileDelete} className="delete">⌫</button>
                         </div>
 
-                        <p className="footer" style={{ fontSize: '13px', color: '#666', marginTop: '15px' }}>Say done after entering mobile number.</p>
+                        <p className="footer" style={{ fontSize: '13px', color: '#666', marginTop: '15px' }}>{t('paymentComplete')}</p>
                       </div>
                     ) : msg.type === 'qr_prompt' ? (
                       <div className="qr-card" style={{ margin: '0 10px', maxWidth: '420px', width: '100%' }}>
-                        <p className="title">Scan the QR Code using your mobile.</p>
+                        <p className="title">{t('qrPrompt')}</p>
 
                         <div className="qr-container">
                           <div className="corner tl"></div>
@@ -710,7 +754,7 @@ function Agent() {
                           <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=DummyPayment123" alt="QR Code" />
                         </div>
 
-                        <p className="scan-text" style={{ marginTop: '15px', color: '#ff3b00', fontWeight: 600 }}>SCAN HERE TO PAY!</p>
+                        <p className="scan-text" style={{ marginTop: '15px', color: '#ff3b00', fontWeight: 600 }}>{t('scanToPay')}</p>
                       </div>
                     ) : (
                       <div className="message-bubble">{msg.content}</div>
@@ -737,7 +781,7 @@ function Agent() {
               </div>
             )}
             {showMenu && (
-              <div className="message bot-message">
+              <div className="message bot-message" ref={menuTopRef}>
                 <div className="menu-categories-container">
                   {viewMode === 'grid' ? (
                     <div className="menu-container">
@@ -750,7 +794,7 @@ function Agent() {
                           <div className="menu-img">
                             <img src={cat.image} alt={cat.name} />
                           </div>
-                          <div className="menu-name">{cat.name}</div>
+                          <div className="menu-name">{t(cat.name)}</div>
                         </div>
                       ))}
                     </div>
@@ -826,6 +870,26 @@ function Agent() {
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Mic Feedback Toast */}
+          {micToast && (
+            <div style={{
+              position: 'absolute',
+              bottom: '100px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'rgba(0,0,0,0.8)',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              fontSize: '0.9rem',
+              zIndex: 100,
+              boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+              animation: 'fadeIn 0.3s ease'
+            }}>
+              {micToast}
+            </div>
+          )}
+
           <div className="chat-input-wrapper">
             <div className="chat-input-box" style={{ padding: '0 10px' }}>
               <input
@@ -844,7 +908,7 @@ function Agent() {
                 }}
               />
               <button
-                className="mic-btn"
+                className={`mic-btn ${isListening ? 'pulse-anim' : ''}`}
                 onClick={toggleListen}
                 style={{ background: isListening ? '#ec1c24' : '#ff4e00', marginLeft: '10px' }}
               >
