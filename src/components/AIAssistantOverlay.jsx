@@ -4,7 +4,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useCart } from '../context/CartContext';
 import './AIAssistantOverlay.css';
 
-const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isCartOpen, setIsCartOpen }) => {
+const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isCartOpen, setIsCartOpen, onPhoneUpdate }) => {
   const { language, t } = useLanguage();
   const { cart, setCart, addToCart, changeQty, removeCartItem, updateNote } = useCart();
   const location = useLocation();
@@ -12,7 +12,7 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
   const [isListening, setIsListening] = useState(false);
 
   // Persist position in localStorage
-  const savedPos = JSON.parse(localStorage.getItem('ai-assistant-pos')) || { x: window.innerWidth - 120, y: window.innerHeight - 150 };
+  const savedPos = JSON.parse(localStorage.getItem('ai-assistant-pos')) || { x: window.innerWidth - 150, y: window.innerHeight - 180 };
   const [position, setPosition] = useState(savedPos);
 
   const [isDragging, setIsDragging] = useState(false);
@@ -31,37 +31,59 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
   const recognition = useRef(SpeechRecognition ? new SpeechRecognition() : null);
 
   useEffect(() => {
-    // Entry Greeting
-    const timer = setTimeout(() => {
-      let greeting = "";
-      if (location.pathname.includes('checkout')) {
-        greeting = t('checkoutPrompt');
-      } else if (location.pathname.includes('payment')) {
-        greeting = t('paymentPrompt');
-      } else if (location.pathname.includes('order-success')) {
-        greeting = t('successPrompt');
-      } else {
-        greeting = language === 'Tamil' 
+    // --- Interruptible Speech ---
+    // Stop speaking if the user clicks or interacts with anything else
+    const stopSpeech = () => {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
+    };
+    window.addEventListener('mousedown', stopSpeech);
+    window.addEventListener('touchstart', stopSpeech);
+
+    // --- Greeting Logic (Only on first load/refresh of Dine-In) ---
+    const hasGreeted = sessionStorage.getItem('ai_has_greeted');
+    const isDineIn = location.pathname === '/' || location.pathname === '/dine-in';
+
+    if (isDineIn && !hasGreeted) {
+      const timer = setTimeout(() => {
+        const greeting = language === 'Tamil' 
           ? "வணக்கம்! டேட்டா உடுப்பிக்கு உங்களை வரவேற்கிறோம். எங்களின் புதிய சைவ உணவுகளைப் பார்த்து மகிழுங்கள். உங்களுக்கு ஏதேனும் உதவி தேவைப்பட்டால் சொல்லுங்கள்."
           : "Vanakkam! Welcome to Data Udipi. Explore our freshly prepared vegetarian dishes. Let me know if you need any help.";
+        
+        setMessages([{ role: 'model', content: greeting }]);
+        speakText(greeting);
+        sessionStorage.setItem('ai_has_greeted', 'true');
+      }, 1500);
+
+      if (recognition.current) {
+        recognition.current.continuous = false;
+        recognition.current.interimResults = false;
+        recognition.current.lang = language === 'Tamil' ? 'ta-IN' : 'en-US';
       }
-      
-      // Reset messages with the context-aware greeting
-      setMessages([{ role: 'model', content: greeting }]);
-      speakText(greeting);
-    }, 1000);
 
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('mousedown', stopSpeech);
+        window.removeEventListener('touchstart', stopSpeech);
+      };
+    }
+
+    // Always update recognition language if it changes
     if (recognition.current) {
-      recognition.current.continuous = false;
-      recognition.current.interimResults = false;
       recognition.current.lang = language === 'Tamil' ? 'ta-IN' : 'en-US';
+    }
 
-      recognition.current.onstart = () => {
-        setIsListening(true);
-      };
-      recognition.current.onend = () => {
-        setIsListening(false);
-      };
+    return () => {
+      window.removeEventListener('mousedown', stopSpeech);
+      window.removeEventListener('touchstart', stopSpeech);
+    };
+  }, [language, location.pathname]);
+
+  useEffect(() => {
+    if (recognition.current) {
+      recognition.current.onstart = () => setIsListening(true);
+      recognition.current.onend = () => setIsListening(false);
       recognition.current.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         setInputText(transcript);
@@ -72,8 +94,7 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
         setIsListening(false);
       };
     }
-    return () => clearTimeout(timer);
-  }, [language, location.pathname]); // Depend on language and location to update greeting and recognition lang
+  }, []);
 
   const toggleListen = () => {
     if (isListening) {
@@ -250,6 +271,20 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
       }
     }
 
+    // --- Voice Command: Detect Phone Number (10 digits) ---
+    // Extract all digits from the text
+    const digits = normalizedText.replace(/\D/g, '');
+    if (digits.length === 10 && onPhoneUpdate) {
+      onPhoneUpdate(digits);
+      const confirmMsg = language === 'Tamil' 
+        ? `சரி, உங்கள் மொபைல் எண் ${digits}-ஐப் பதிவு செய்துவிட்டேன்.`
+        : `Got it! I've entered ${digits.split('').join(' ')} as your phone number.`;
+      setMessages(prev => [...prev, { role: 'model', content: confirmMsg }]);
+      speakText(confirmMsg);
+      setIsLoading(false);
+      return;
+    }
+
     if (isRemove) {
       const removeMatch = normalizedText.match(/(?:remove|delete|cancel|take off|drop)\s+(.+)/i);
       if (removeMatch) {
@@ -353,6 +388,8 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
     PERSONALITY: Warm, welcoming, knowledgeable, premium restaurant steward with a friendly South Indian touch.
     TONE: Polite, enthusiastic, natural Indian-accented English. Short, meaningful sentences.
 
+    CRITICAL: Keep responses extremely concise and under 15 words for maximum speed.
+
     MENU KNOWLEDGE:
     ${menuContext}
 
@@ -383,6 +420,10 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
           contents: [{ role: 'user', parts: [{ text }] }],
           systemInstruction: {
             parts: [{ text: systemPrompt }]
+          },
+          generationConfig: {
+            temperature: 1.0,
+            maxOutputTokens: 150,
           }
         })
       });
@@ -573,17 +614,7 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
           <div className="ai-hero-frosted-original">
             <header className="ai-unified-header">
               <span>Talk To Your Agent</span>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                {messages.length > 0 && (
-                  <button
-                    onClick={() => setMessages([])}
-                    style={{ background: 'none', border: 'none', color: 'white', fontSize: '12px', cursor: 'pointer', opacity: 0.7 }}
-                  >
-                    Clear Chat
-                  </button>
-                )}
-                <button className="ai-close-x" onClick={toggleSidebar}>&times;</button>
-              </div>
+              <button className="ai-close-x" onClick={toggleSidebar}>&times;</button>
             </header>
 
             <div className="ai-namaste-wrap-original">

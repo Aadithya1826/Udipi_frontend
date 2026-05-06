@@ -23,10 +23,7 @@ const Checkout = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    table: '6',
-    instructions: 'lless spicy,No Onions'
+    phone: ''
   });
 
   useEffect(() => {
@@ -53,19 +50,33 @@ const Checkout = () => {
   };
 
   const handlePayment = () => {
-    if (!formData.name.trim()) {
-      showModal('Please enter your name');
+    const mobileNumber = formData.phone.trim();
+    
+    if (!mobileNumber) {
+      showModal("Please enter your mobile number");
       return;
     }
-    if (!formData.phone.trim()) {
-      showModal('Please enter your phone number');
+    if (!/^\d+$/.test(mobileNumber)) {
+      showModal("Mobile number should contain only numbers");
       return;
     }
-    if (!/^\d{10}$/.test(formData.phone)) {
-      showModal('Please enter a valid 10-digit phone number');
+    if (mobileNumber.length < 10) {
+      showModal("Mobile number must be 10 digits");
       return;
     }
-    // Navigate to Payment page, passing only form data as cart is global
+    if (mobileNumber.length > 10) {
+      showModal("Mobile number cannot exceed 10 digits");
+      return;
+    }
+    if (!/^[6-9]/.test(mobileNumber)) {
+      showModal("Please enter a valid Indian mobile number");
+      return;
+    }
+    if (/^(\d)\1{9}$/.test(mobileNumber)) {
+      showModal("Please enter a valid mobile number");
+      return;
+    }
+
     setIsCartOpen(false);
     navigate('/payment', {
       state: { formData }
@@ -97,45 +108,13 @@ const Checkout = () => {
               <p className="checkout-section-label">Customer details</p>
 
               <div className="checkout-field">
-                <label htmlFor="name">FULL NAME*</label>
-                <input
-                  type="text"
-                  id="name"
-                  placeholder="Jon"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                />
-              </div>
-
-              <div className="checkout-field">
                 <label htmlFor="phone">PHONE NUMBER*</label>
                 <input
                   type="tel"
                   id="phone"
-                  placeholder="10 digit number"
+                  placeholder=""
                   maxLength="10"
                   value={formData.phone}
-                  onChange={handleInputChange}
-                />
-              </div>
-
-              <div className="checkout-field">
-                <label htmlFor="table">TABLE NO*</label>
-                <input
-                  type="text"
-                  id="table"
-                  value={formData.table}
-                  className="co-filled"
-                  readOnly
-                />
-              </div>
-
-              <div className="checkout-field">
-                <label htmlFor="instructions">SPECIAL INSTRUCTIONS</label>
-                <textarea
-                  id="instructions"
-                  placeholder="e.g. less spicy, No Onions"
-                  value={formData.instructions}
                   onChange={handleInputChange}
                 />
               </div>
@@ -161,22 +140,7 @@ const Checkout = () => {
                         <span className="checkout-item-price">Rs. {item.price * item.quantity}</span>
                       </div>
                     ))}
-                    <div style={{ textAlign: 'center', marginTop: '15px' }}>
-                      <Link
-                        to="/dine-in"
-                        style={{
-                          color: '#ff4e00',
-                          textDecoration: 'none',
-                          fontWeight: '700',
-                          fontSize: '14px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px'
-                        }}
-                      >
-                        <i className="fa-solid fa-plus-circle"></i> Add More Food
-                      </Link>
-                    </div>
+
                   </>
                 )}
               </div>
@@ -305,6 +269,9 @@ const Checkout = () => {
         navigate={navigate} 
         isCartOpen={isCartOpen} 
         setIsCartOpen={setIsCartOpen} 
+        onPhoneUpdate={(digits) => {
+          setFormData(prev => ({ ...prev, phone: digits }));
+        }}
       />
     </div>
   );

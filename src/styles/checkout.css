@@ -1,11 +1,11 @@
 /* ── Checkout Page ─────────────────────────────────────────── */
 
-.checkout-page {
+.checkout-page, .payment-page {
   position: relative;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  padding-top: 40px;
+  padding-top: 10px; /* Reduced */
   overflow: hidden;
 }
 
