@@ -4,7 +4,7 @@ const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
+
 
   const addToCart = (item) => {
     setCart((prev) => {
@@ -53,8 +53,6 @@ export const CartProvider = ({ children }) => {
       value={{
         cart,
         setCart,
-        isCartOpen,
-        setIsCartOpen,
         addToCart,
         changeQty,
         removeCartItem,

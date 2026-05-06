@@ -4,9 +4,9 @@ import { useLanguage } from '../context/LanguageContext';
 import { useCart } from '../context/CartContext';
 import './AIAssistantOverlay.css';
 
-const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [] }) => {
+const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isCartOpen, setIsCartOpen }) => {
   const { language, t } = useLanguage();
-  const { cart, setCart, isCartOpen, setIsCartOpen, addToCart, changeQty, removeCartItem, updateNote } = useCart();
+  const { cart, setCart, addToCart, changeQty, removeCartItem, updateNote } = useCart();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);

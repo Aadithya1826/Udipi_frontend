@@ -9,8 +9,6 @@ const Payment = () => {
   const navigate = useNavigate();
   const {
     cart,
-    isCartOpen,
-    setIsCartOpen,
     changeQty,
     removeCartItem,
     updateNote,
@@ -21,10 +19,15 @@ const Payment = () => {
     totalAmount: total
   } = useCart();
 
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
   const { formData = {} } = location.state || {};
 
   useEffect(() => {
     setIsCartOpen(false);
+    return () => {
+      setIsCartOpen(false);
+    };
   }, []);
 
   const handleConfirm = () => {
@@ -88,65 +91,66 @@ const Payment = () => {
       )}
 
       {/* Cart sidebar (Floating) - Exact Design Match */}
-      <div className={`di-sidebar di-cart-mode ${isCartOpen ? 'active' : ''}`}>
-        <div className="di-cart-header">
-          <div className="di-cart-header-left">
-            <span className="di-cart-title">Cart</span>
-            <span className="di-cart-table-pill">Table No : 06 <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
+      {isCartOpen && (
+        <div className="di-sidebar di-cart-mode active">
+          <div className="di-cart-header">
+            <div className="di-cart-header-left">
+              <span className="di-cart-title">Cart</span>
+              <span className="di-cart-table-pill">Table No : 06 <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
+            </div>
+            <button className="di-cart-close" onClick={() => setIsCartOpen(false)}>✕</button>
           </div>
-          <button className="di-cart-close" onClick={() => setIsCartOpen(false)}>✕</button>
-        </div>
-        <div className="di-cart-order-id"># Order ID : 2002</div>
+          <div className="di-cart-order-id"># Order ID : 2002</div>
 
-        <div className="di-order-type-tabs">
-          <button className="di-ot-tab active"><i className="fa-solid fa-utensils" /> Dine In</button>
-          <button className="di-ot-tab"><i className="fa-solid fa-bag-shopping" /> Take Away</button>
-        </div>
+          <div className="di-order-type-tabs">
+            <button className="di-ot-tab active"><i className="fa-solid fa-utensils" /> Dine In</button>
+            <button className="di-ot-tab"><i className="fa-solid fa-bag-shopping" /> Take Away</button>
+          </div>
 
-        <div className="di-cart-items">
-          {cart.length === 0
-            ? <p className="di-cart-empty">Cart is empty. Add items from the menu.</p>
-            : cart.map(item => (
-              <div key={item.id} className="di-cart-item-container">
-                <button className="di-cart-remove-circle" onClick={() => removeCartItem(item.id)}>✕</button>
-                <div className="di-cart-item-body">
-                  <div className="di-cart-item-thumb">
-                    {item.image ? <img src={item.image} alt={item.name} /> : <span className="di-cart-thumb-emoji">{item.emoji || '🍽️'}</span>}
-                  </div>
-                  <div className="di-cart-item-details">
-                    <p className="di-cart-item-name">{item.name}</p>
-                    <p className="di-cart-serves">Serves : 1</p>
-                    <p className="di-cart-item-price">Rs. {item.price}</p>
-                  </div>
-                  <div className="di-cart-item-right">
-                    <p className="di-cart-total-label">Total</p>
-                    <p className="di-cart-total-amount">{(item.price * item.quantity).toFixed(2)}</p>
-                    <p className="di-cart-gst">+ GST</p>
-                    <div className="di-cart-stepper">
-                      <button className="di-cart-qty-btn minus" onClick={() => changeQty(item.id, -1)}>−</button>
-                      <span className="di-cart-qty-num">{item.quantity}</span>
-                      <button className="di-cart-qty-btn plus" onClick={() => changeQty(item.id, 1)}>+</button>
+          <div className="di-cart-items">
+            {cart.length === 0
+              ? <p className="di-cart-empty">Cart is empty. Add items from the menu.</p>
+              : cart.map(item => (
+                <div key={item.id} className="di-cart-item-container">
+                  <button className="di-cart-remove-circle" onClick={() => removeCartItem(item.id)}>✕</button>
+                  <div className="di-cart-item-body">
+                    <div className="di-cart-item-thumb">
+                      {item.image ? <img src={item.image} alt={item.name} /> : <span className="di-cart-thumb-emoji">{item.emoji || '🍽️'}</span>}
+                    </div>
+                    <div className="di-cart-item-details">
+                      <p className="di-cart-item-name">{item.name}</p>
+                      <p className="di-cart-serves">Serves : 1</p>
+                      <p className="di-cart-item-price">Rs. {item.price}</p>
+                    </div>
+                    <div className="di-cart-item-right">
+                      <p className="di-cart-total-label">Total</p>
+                      <p className="di-cart-total-amount">{(item.price * item.quantity).toFixed(2)}</p>
+                      <p className="di-cart-gst">+ GST</p>
+                      <div className="di-cart-stepper">
+                        <button className="di-cart-qty-btn minus" onClick={() => changeQty(item.id, -1)}>−</button>
+                        <span className="di-cart-qty-num">{item.quantity}</span>
+                        <button className="di-cart-qty-btn plus" onClick={() => changeQty(item.id, 1)}>+</button>
+                      </div>
                     </div>
                   </div>
+                  <div className="di-cart-note-wrap">
+                    <input className="di-cart-note-input" placeholder="Please, Just a little bit spicy only...." value={item.note || ''} onChange={e => updateNote(item.id, e.target.value)} />
+                  </div>
                 </div>
-                <div className="di-cart-note-wrap">
-                  <input className="di-cart-note-input" placeholder="Please, Just a little bit spicy only...." value={item.note || ''} onChange={e => updateNote(item.id, e.target.value)} />
-                </div>
-              </div>
-            ))
-          }
-        </div>
+              ))
+            }
+          </div>
 
-        <div className="di-cart-footer">
-          <button className="di-add-more-btn" onClick={() => navigate('/dine-in')}>
-            <i className="fa-solid fa-plus" /> Add More Food
-          </button>
-          <button className="di-place-order-btn" onClick={() => setIsCartOpen(false)}>
-            Close & Continue
-          </button>
+          <div className="di-cart-footer">
+            <button className="di-add-more-btn" onClick={() => navigate('/dine-in')}>
+              <i className="fa-solid fa-plus" /> Add More Food
+            </button>
+            <button className="di-place-order-btn" onClick={() => setIsCartOpen(false)}>
+              Close & Continue
+            </button>
+          </div>
         </div>
-
-      </div>
+      )}
 
 
 

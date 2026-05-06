@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
+import { useCart } from '../context/CartContext'
 import Header from '../components/Header'
 import Invoice from './Invoice'
 import '../styles/pages.css'
@@ -277,8 +278,16 @@ function Agent() {
   const [activeCategory, setActiveCategory] = useState('all')
   const [viewMode, setViewMode] = useState('grid') // 'grid' for categories, 'list' for items
 
-  // Cart State Management
-  const [cart, setCart] = useState([])
+  // Cart State Management from Context
+  const {
+    cart,
+    setCart,
+    addToCart,
+    changeQty,
+    removeCartItem,
+    totalItems,
+    subtotal: totalAmount
+  } = useCart()
 
   // Checkout & Mobile Flow State
   const [isAwaitingMobile, setIsAwaitingMobile] = useState(false)
@@ -550,17 +559,9 @@ function Agent() {
     ])
   }
 
-  // Cart Functions
+  // Cart Functions using Context
   const handleAddToCart = (item) => {
-    setCart(prev => {
-      const existing = prev.find(cartItem => cartItem.id === item.id)
-      if (existing) {
-        return prev.map(cartItem =>
-          cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
-        )
-      }
-      return [...prev, { ...item, quantity: 1 }]
-    })
+    addToCart(item)
 
     // Instant local AI feedback without roundtrip
     setMessages(prev => [
@@ -571,17 +572,9 @@ function Agent() {
   }
 
   const updateCartQty = (itemId, delta) => {
-    setCart(prev => prev.map(item => {
-      if (item.id === itemId) {
-        const newQty = item.quantity + delta;
-        return newQty > 0 ? { ...item, quantity: newQty } : null;
-      }
-      return item;
-    }).filter(Boolean));
+    changeQty(itemId, delta)
   }
 
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0)
-  const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)
 
   const handleCheckout = () => {
     const subtotal = totalAmount;
