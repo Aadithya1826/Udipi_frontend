@@ -5,7 +5,7 @@
     justify-content: space-between;
     align-items: flex-start;
     padding: 0 1rem;
-    margin-top: 2rem;
+    margin-top: 0.5rem;
     position: relative;
     z-index: 10;
     gap: 2rem;
@@ -54,7 +54,7 @@
     flex-direction: column;
     align-items: center;
     position: absolute;
-    top: -4rem;
+    top: -5.5rem;
     left: 50%;
     transform: translateX(-50%);
 }
@@ -71,7 +71,7 @@
 .logo-sign.title-mode {
     position: relative;
     /* anchor positioning */
-    top: 0.5rem;
+    top: -0.5rem;
     /* vertical alignment */
     left: 10rem;
     /* push it slightly from the left edge */
@@ -255,32 +255,6 @@
     border-radius: 0 0 12px 12px;
 }
 
-
-/* Talk to Waiter Button */
-.talk-waiter-btn-container {
-    display: flex;
-    justify-content: flex-end;
-}
-
-.talk-waiter-btn {
-    background: #1a7a3b;
-    border: 2px solid white;
-    color: white;
-    padding: 6px 18px;
-    border-radius: 30px;
-    font-weight: 700;
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-    transition: transform 0.2s;
-}
-
-.talk-waiter-btn:hover {
-    transform: scale(1.05);
-}
 
 /* Footer Styles */
 .footer {

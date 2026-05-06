@@ -13,6 +13,10 @@
     /* account for fixed header */
 }
 
+.home-page-container {
+    padding-top: 3.5rem !important;
+}
+
 @keyframes fadeIn {
     from {
         opacity: 0;

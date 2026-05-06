@@ -1,76 +1,77 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
-import Header from '../components/Header'
+import { useCart } from '../context/CartContext'
 import MenuItemModal from '../components/MenuItemModal'
 import '../styles/pages.css'
 
 const takeawayPackages = [
-  { 
-    id: 1, 
-    name: 'Breakfast Box', 
+  {
+    id: 1,
+    name: 'Breakfast Box',
     tamilName: 'காலை உணவுப் பெட்டி',
     description: 'Idly, Vada, Pongal with Sambar & Chutney',
     tamilDescription: 'இட்லி, வடை, பொங்கல் சாம்பார் மற்றும் சட்னியுடன்',
-    items: 3, 
+    items: 3,
     price: 120,
-    image: '/cat-breakfast.png'
+    image: '/cat_breakfast.png'
   },
-  { 
-    id: 2, 
-    name: 'Dosa Combo', 
+  {
+    id: 2,
+    name: 'Dosa Combo',
     tamilName: 'தோசை காம்போ',
     description: 'Masala Dosa, Rava Dosa with sides',
     tamilDescription: 'மசாலா தோசை, ரவா தோசை பக்க உணவுகளுடன்',
-    items: 4, 
+    items: 4,
     price: 160,
-    image: '/cat-dosa.png'
+    image: '/cat_dosa.png'
   },
-  { 
-    id: 3, 
-    name: 'Lunch Thali', 
+  {
+    id: 3,
+    name: 'Lunch Thali',
     tamilName: 'மதிய உணவுத் தட்டு',
     description: 'Full meals with rice, sambar, rasam & more',
     tamilDescription: 'சாதம், சாம்பார், ரசம் மற்றும் பலவற்றுடன் கூடிய முழு உணவு',
-    items: 6, 
+    items: 6,
     price: 130,
-    image: '/cat-lunch.png'
+    image: '/cat_lunch.png'
   },
-  { 
-    id: 4, 
-    name: 'North Indian Combo', 
+  {
+    id: 4,
+    name: 'North Indian Combo',
     tamilName: 'வட இந்திய காம்போ',
     description: 'Nan, Paneer Butter Masala & Pulav',
     tamilDescription: 'நான், பன்னீர் பட்டர் மசாலா மற்றும் புலாவ்',
-    items: 3, 
+    items: 3,
     price: 250,
-    image: '/cat-northindian.png'
+    image: 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400'
   },
-  { 
-    id: 5, 
-    name: 'Snack Pack', 
+  {
+    id: 5,
+    name: 'Snack Pack',
     tamilName: 'சிற்றுண்டிப் பொதி',
     description: 'Bajji, Bonda, Chola Poori & Tea',
     tamilDescription: 'பஜ்ஜி, போண்டா, சோலா பூரி மற்றும் டீ',
-    items: 4, 
+    items: 4,
     price: 180,
-    image: '/cat-snacks.png'
+    image: 'https://images.unsplash.com/photo-1601050638917-3f80dd03d0d3?w=400'
   },
-  { 
-    id: 6, 
-    name: 'Party Feast', 
+  {
+    id: 6,
+    name: 'Party Feast',
     tamilName: 'பார்ட்டி விருந்து',
     description: 'Biryani, Noodles, Gobi 65 & more',
     tamilDescription: 'பிரியாணி, நூடுல்ஸ், கோபி 65 மற்றும் பல',
-    items: 8, 
+    items: 8,
     price: 499,
-    image: '/cat-rice.png'
+    image: '/cat_rice.png'
   },
 ]
 
 function TakeAway() {
   const navigate = useNavigate()
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
+  const { addToCart } = useCart()
   const [selectedItem, setSelectedItem] = useState(null)
   const [showModal, setShowModal] = useState(false)
 
@@ -85,18 +86,30 @@ function TakeAway() {
   }
 
   const handleAddToCart = (cartItem) => {
-    console.log('Added to cart:', cartItem)
-    // TODO: Implement add to cart functionality
-    const itemName = language === 'Tamil' ? cartItem.item.tamilName : cartItem.item.name;
-    alert(`${itemName} x${cartItem.quantity} added to cart!`)
+    // cartItem.item is just the name string from MenuItemModal usage in TakeAway
+    // We should pass the whole object.
+    const pkg = takeawayPackages.find(p => (language === 'Tamil' ? p.tamilName : p.name) === cartItem.item);
+    if (pkg) {
+      // Add based on quantity
+      for (let i = 0; i < cartItem.quantity; i++) {
+        addToCart({
+          id: `takeaway-${pkg.id}`,
+          name: pkg.name,
+          tamilName: pkg.tamilName,
+          price: pkg.price,
+          description: pkg.description,
+          image: pkg.image
+        });
+      }
+    }
     handleCloseModal()
   }
 
   return (
     <div className="app-container">
       <div className="background-image"></div>
-      
-      <Header tableNumber="06" showFullHeader={true} />
+
+
 
       <main className="page-content">
         <div className="page-title-section">
@@ -125,10 +138,10 @@ function TakeAway() {
         </div>
 
         {showModal && selectedItem && (
-          <MenuItemModal 
+          <MenuItemModal
             item={{
-              item: language === 'Tamil' ? selectedItem.tamilName : selectedItem.name, 
-              price: selectedItem.price, 
+              item: language === 'Tamil' ? selectedItem.tamilName : selectedItem.name,
+              price: selectedItem.price,
               description: language === 'Tamil' ? selectedItem.tamilDescription : selectedItem.description
             }}
             category={t('takeAway')}

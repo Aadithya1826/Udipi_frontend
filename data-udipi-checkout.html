@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Data Udipi – Checkout</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:       #2e7d32;
+      --green-light: #4caf50;
+      --green-btn:   #388e3c;
+      --orange:      #e65100;
+      --bg:          #1a1a18;
+      --surface:     #ffffff;
+      --surface-2:   #f5f5f3;
+      --border:      #e0e0d8;
+      --text:        #1c1c1a;
+      --muted:       #6b6b62;
+      --tag-bg:      #f0faf0;
+      --shadow:      0 8px 40px rgba(0,0,0,.18);
+      --radius:      16px;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(46,125,50,.35) 0%, transparent 70%),
+        url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+
+    /* ── TOP NAV ── */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 28px;
+      background: rgba(255,255,255,.07);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-left { display: flex; align-items: center; gap: 14px; }
+
+    .table-tag {
+      display: flex; align-items: center; gap: 8px;
+      color: #fff; font-size: 13px; font-weight: 500;
+    }
+    .table-badge {
+      background: var(--orange);
+      color: #fff;
+      font-size: 18px; font-weight: 700;
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      display: grid; place-items: center;
+      box-shadow: 0 0 0 3px rgba(230,81,0,.3);
+    }
+
+    .brand {
+      display: flex; align-items: center; gap: 8px;
+      color: #fff; font-size: 22px; font-weight: 700;
+      letter-spacing: -.5px;
+    }
+    .brand-leaf { font-size: 26px; }
+    .brand span { color: var(--green-light); }
+
+    .nav-right {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .nav-pill {
+      display: flex; align-items: center; gap: 7px;
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 999px;
+      padding: 7px 14px;
+      color: #fff; font-size: 13px; font-weight: 500;
+      cursor: default;
+    }
+    .nav-pill svg { opacity: .7; }
+    .lang-pill { cursor: pointer; transition: background .2s; }
+    .lang-pill:hover { background: rgba(255,255,255,.18); }
+
+    /* ── MAIN CONTENT ── */
+    .main {
+      flex: 1;
+      padding: 32px 28px 48px;
+      max-width: 1240px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: rgba(255,255,255,.55);
+      font-size: 13px; font-weight: 500;
+      text-decoration: none;
+      margin-bottom: 24px;
+      transition: color .2s;
+    }
+    .back-link:hover { color: rgba(255,255,255,.9); }
+
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 40px 44px;
+      display: grid;
+      grid-template-columns: 1fr 420px;
+      gap: 48px;
+      animation: slideUp .45s cubic-bezier(.22,.61,.36,1) both;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(28px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── LEFT – FORM ── */
+    .form-section {}
+
+    .checkout-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 34px;
+      color: var(--text);
+      line-height: 1.15;
+      margin-bottom: 2px;
+    }
+    .order-type {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 400;
+      margin-bottom: 32px;
+    }
+
+    .section-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: .4px;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1.5px solid var(--border);
+    }
+
+    .field { margin-bottom: 18px; }
+    .field label {
+      display: block;
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 7px;
+    }
+    .field input,
+    .field textarea {
+      width: 100%;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 15px;
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text);
+      background: var(--surface);
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+      resize: none;
+    }
+    .field input:focus,
+    .field textarea:focus {
+      border-color: var(--green);
+      box-shadow: 0 0 0 3px rgba(46,125,50,.12);
+    }
+    .field input.filled { background: var(--surface-2); }
+    .field input::placeholder,
+    .field textarea::placeholder { color: #bdbdad; }
+
+    .field textarea { min-height: 90px; }
+
+    /* ── RIGHT – ORDER SUMMARY ── */
+    .summary-section {
+      background: var(--surface-2);
+      border-radius: 12px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .summary-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 20px;
+    }
+
+    .order-item {
+      padding: 14px 0;
+      border-bottom: 1px dashed var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .order-item:last-of-type { border-bottom: none; }
+
+    .item-info {}
+    .item-name { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+    .item-desc { font-size: 12px; color: var(--muted); line-height: 1.4; max-width: 220px; }
+    .item-price { font-size: 14px; font-weight: 700; color: var(--text); white-space: nowrap; flex-shrink: 0; }
+
+    .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+    .billing-row {
+      display: flex; justify-content: space-between;
+      font-size: 13px; color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .billing-row.total {
+      font-size: 15px; font-weight: 700;
+      color: var(--text);
+      margin-top: 10px;
+      padding-top: 12px;
+      border-top: 2px solid var(--border);
+    }
+
+    .pay-btn {
+      margin-top: 24px;
+      width: 100%;
+      padding: 16px;
+      background: var(--green-btn);
+      color: #fff;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      letter-spacing: .3px;
+      transition: background .2s, transform .15s, box-shadow .2s;
+      box-shadow: 0 4px 20px rgba(56,142,60,.4);
+      position: relative;
+      overflow: hidden;
+    }
+    .pay-btn::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.12) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .pay-btn:hover {
+      background: #2e7d32;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 28px rgba(56,142,60,.55);
+    }
+    .pay-btn:active { transform: translateY(0); }
+
+    /* toast */
+    .toast {
+      position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(60px);
+      background: #1c1c1a; color: #fff;
+      padding: 12px 24px; border-radius: 999px;
+      font-size: 14px; font-weight: 500;
+      box-shadow: 0 8px 32px rgba(0,0,0,.4);
+      opacity: 0; pointer-events: none;
+      transition: opacity .3s, transform .3s;
+      z-index: 999;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 860px) {
+      .card { grid-template-columns: 1fr; padding: 28px 22px; }
+      .nav-right { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-left">
+    <div class="table-tag">
+      <span>Table no :</span>
+      <div class="table-badge">06</div>
+    </div>
+  </div>
+
+  <div class="brand">
+    <span class="brand-leaf">🌿</span>
+    <span>D</span>ATA UDIPI
+  </div>
+
+  <div class="nav-right">
+    <div class="nav-pill">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      <span id="dateDisplay"></span>
+    </div>
+    <div class="nav-pill">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      <span id="timeDisplay"></span>
+    </div>
+    <div class="nav-pill lang-pill">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      Languages
+    </div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+  <a href="#" class="back-link">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+    Back to Menu
+  </a>
+
+  <div class="card">
+
+    <!-- FORM -->
+    <div class="form-section">
+      <h1 class="checkout-title">Checkout</h1>
+      <p class="order-type">Dine In Order</p>
+
+      <p class="section-label">Customer details</p>
+
+      <div class="field">
+        <label>Full Name *</label>
+        <input type="text" id="name" placeholder="Jon" value="" />
+      </div>
+      <div class="field">
+        <label>Phone Number *</label>
+        <input type="tel" id="phone" placeholder="10 digit number" maxlength="10" />
+      </div>
+      <div class="field">
+        <label>Table No *</label>
+        <input type="text" id="table" value="6" class="filled" readonly />
+      </div>
+      <div class="field">
+        <label>Special Instructions</label>
+        <textarea id="instructions" placeholder="e.g. less spicy, No Onions">less spicy,No Onions</textarea>
+      </div>
+    </div>
+
+    <!-- ORDER SUMMARY -->
+    <div class="summary-section">
+      <p class="summary-title">Order Summary</p>
+
+      <div class="order-item">
+        <div class="item-info">
+          <p class="item-name">Onion Rava Dosa</p>
+          <p class="item-desc">Crispy, lacy semolina crepes infused with sautéed onions, green chillies.</p>
+        </div>
+        <span class="item-price">Rs. 100</span>
+      </div>
+
+      <div class="order-item">
+        <div class="item-info">
+          <p class="item-name">North Indian Meals</p>
+          <p class="item-desc">Crispy, lacy semolina crepes infused with sautéed onions, green chillies.</p>
+        </div>
+        <span class="item-price">Rs. 300</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="billing-row"><span>Sub total</span><span>Rs. 300.00</span></div>
+      <div class="billing-row"><span>Service Charge (5%)</span><span>Rs. 30.00</span></div>
+      <div class="billing-row"><span>GST (18%)</span><span>Rs. 15.00</span></div>
+      <div class="billing-row"><span>Service Charge (0)</span><span>Rs. 0</span></div>
+      <div class="billing-row total"><span>Total :</span><span>Rs. 345.00</span></div>
+
+      <button class="pay-btn" onclick="handlePayment()">Continue to Payment</button>
+    </div>
+
+  </div>
+</main>
+
+<div class="toast" id="toast">✅ Order placed! Redirecting to payment…</div>
+
+<script>
+  /* Live clock */
+  function updateClock() {
+    const now = new Date();
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const day = days[now.getDay()];
+    const date = now.getDate();
+    const month = months[now.getMonth()];
+    const year = now.getFullYear();
+    let h = now.getHours(), m = now.getMinutes();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    const mm = m < 10 ? '0' + m : m;
+    document.getElementById('dateDisplay').textContent = `${day}, ${date} ${month} ${year}`;
+    document.getElementById('timeDisplay').textContent = `${h}:${mm} ${ampm}`;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  /* Payment handler */
+  function handlePayment() {
+    const name = document.getElementById('name').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    if (!name) { alert('Please enter your full name.'); return; }
+    if (!/^\d{10}$/.test(phone)) { alert('Please enter a valid 10-digit phone number.'); return; }
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+</script>
+</body>
+</html>

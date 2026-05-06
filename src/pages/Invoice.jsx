@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import AIAssistantOverlay from '../components/AIAssistantOverlay';
 import '../styles/invoice.css';
 
 export default function Invoice({ embeddedData }) {
@@ -13,7 +14,8 @@ export default function Invoice({ embeddedData }) {
     subtotal = 0,
     gst = 0,
     finalTotal = 0,
-    mobileNumber = 'WALK-IN'
+    mobileNumber = 'WALK-IN',
+    paymentMethod = 'CASH'
   } = data;
 
   const isEmbedded = !!embeddedData;
@@ -21,6 +23,9 @@ export default function Invoice({ embeddedData }) {
   const totalQty = cartData.reduce((acc, item) => acc + item.quantity, 0);
   const now = new Date();
   const formattedDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
+  // UPI payment string if method is UPI
+  const upiQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=dataudipi@upi%26pn=DataUdipi%26am=${finalTotal.toFixed(2)}%26cu=INR`;
 
   const content = (
       <div className="invoice-container" style={isEmbedded ? { margin: '0 auto' } : {}}>
@@ -151,7 +156,7 @@ export default function Invoice({ embeddedData }) {
           <div className="payment-delivery">
             <p className="payment-title">Payment & Delivery</p>
             <div className="payment-row">
-              <p>CREDIT CARD (99999***********)</p>
+              <p>{paymentMethod.toUpperCase()}</p>
               <p className="bold-text">₹{finalTotal.toFixed(2)}</p>
             </div>
             <div className="payment-row total-received">
@@ -166,7 +171,7 @@ export default function Invoice({ embeddedData }) {
           </div>
 
           <div className="qr-code-section">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=DummyPayment123" alt="QR Code" className="qr-img" />
+            <img src={paymentMethod.toUpperCase() === 'UPI' ? upiQrUrl : "https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=CashPaymentConfirmed"} alt="QR Code" className="qr-img" />
           </div>
 
           <div className="invoice-terms">

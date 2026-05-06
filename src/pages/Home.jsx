@@ -11,11 +11,10 @@ function Home() {
   const { t } = useLanguage()
 
   return (
-    <div className="app-container">
+    <div className="app-container home-page-container">
       <div className="background-image"></div>
+      <Header tableNumber="06" showFullHeader={true} useTitleImage={false} showDateTime={false} />
       
-      <Header tableNumber={tableNumber} />
-
       <main className="main-content">
         <h2 className="welcome-text">{t('welcome')}</h2>
         <div className="main-title">

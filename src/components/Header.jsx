@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useLanguage } from '../context/LanguageContext'
 import '../styles/components.css'
 
-function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = false }) {
+function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = false, showDateTime = true }) {
   const { language, setLanguage, t } = useLanguage()
   const [showLangDropdown, setShowLangDropdown] = useState(false)
   const [currentDate, setCurrentDate] = useState('')
@@ -52,7 +52,7 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
       <div className="header-right">
         <div className="header-top-right">
           {/* Date-Time (for full header) */}
-          {showFullHeader && (
+          {showFullHeader && showDateTime && (
             <div className="date-time-box">
               <i className="fa-regular fa-calendar"></i>
               <span>{currentDate}</span>
@@ -89,15 +89,6 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
             )}
           </div>
         </div>
-
-        {/* Talk to Waiter (for full header) */}
-        {showFullHeader && (
-          <div className="talk-waiter-btn-container">
-            <button className="talk-waiter-btn">
-              <i className="fa-solid fa-headset"></i> {t('talkWaiter')}
-            </button>
-          </div>
-        )}
       </div>
     </header>
   )

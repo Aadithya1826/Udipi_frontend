@@ -626,8 +626,9 @@ function Agent() {
   return (
     <div className="app-container">
       <div className="background-image"></div>
-
       <Header tableNumber="06" showFullHeader={true} useTitleImage={true} />
+
+
 
       <main className="agent-page-content">
         <div className="agent-chat-container">
