@@ -1,0 +1,242 @@
+/* ── Order Success Page ─────────────────────────────────────── */
+
+.os-page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding-top: 40px;
+}
+
+.os-bg {
+  position: fixed;
+  inset: 0;
+  background: url('/restaurant_bg.png') center / cover no-repeat;
+  filter: blur(4px) brightness(0.55);
+  z-index: 0;
+  transform: scale(1.05);
+}
+
+.os-main {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 18px 24px 36px;
+}
+
+.os-card {
+  background: #fff;
+  border-radius: 24px;
+  width: 100%;
+  max-width: 620px;
+  padding: 34px 40px 36px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+  animation: osSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  text-align: center;
+}
+
+@keyframes osSlideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.os-tick-wrap {
+  width: 92px;
+  height: 92px;
+  margin: 6px auto 16px;
+}
+
+.os-checkmark {
+  width: 92px;
+  height: 92px;
+  display: block;
+}
+
+.os-check-circle {
+  stroke: #18a832;
+  stroke-width: 4;
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  animation: osStroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.os-check-path {
+  stroke: #18a832;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  animation: osStroke 0.45s cubic-bezier(0.65, 0, 0.45, 1) 0.45s forwards;
+}
+
+@keyframes osStroke {
+  to { stroke-dashoffset: 0; }
+}
+
+.os-title {
+  font-size: 32px;
+  font-weight: 900;
+  color: #111;
+  margin: 6px 0 6px;
+}
+
+.os-subtitle {
+  color: #777;
+  font-size: 14px;
+  margin-bottom: 18px;
+}
+
+.os-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  background: #f7f7f7;
+  border-radius: 16px;
+  padding: 18px;
+  margin: 0 auto 18px;
+  text-align: left;
+}
+
+.os-meta-item {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.os-meta-label {
+  display: block;
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.os-meta-value {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  color: #111;
+}
+
+.os-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fff5f2;
+  color: #ff4500;
+  border: 1px solid rgba(255, 69, 0, 0.25);
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.os-total { color: #18a832; }
+
+.os-items {
+  text-align: left;
+  margin: 14px 0 10px;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 16px;
+  padding: 16px 18px;
+}
+
+.os-items-title {
+  font-size: 13px;
+  color: #555;
+  font-weight: 900;
+  margin-bottom: 12px;
+}
+
+.os-item-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 13px;
+  color: #444;
+  padding: 8px 0;
+  border-bottom: 1px dashed #e6e6e6;
+}
+
+.os-item-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.os-mascot {
+  width: 180px;
+  max-width: 60%;
+  margin: 14px auto 6px;
+  display: block;
+  filter: drop-shadow(0 10px 22px rgba(0,0,0,0.15));
+}
+
+.os-message {
+  margin: 8px 0 18px;
+  color: #555;
+  font-size: 14px;
+}
+
+.os-actions {
+  display: flex;
+  gap: 16px;
+  margin: 10px 0 18px;
+}
+
+.os-home-btn, .os-download-btn {
+  flex: 1;
+  padding: 15px;
+  font-size: 15px;
+  font-weight: 800;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.os-home-btn {
+  background: #ff4e00;
+  color: #fff;
+  box-shadow: 0 6px 24px rgba(255, 78, 0, 0.3);
+}
+
+.os-home-btn:hover {
+  background: #e64600;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 32px rgba(255, 78, 0, 0.4);
+}
+
+.os-download-btn {
+  background: #18a832;
+  color: #fff;
+  box-shadow: 0 6px 24px rgba(24, 168, 50, 0.3);
+}
+
+.os-download-btn:hover {
+  background: #15952d;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 32px rgba(24, 168, 50, 0.4);
+}
+
+.os-home-btn:active, .os-download-btn:active { transform: translateY(0); }
+
+.os-countdown {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #777;
+}
+
+@media (max-width: 540px) {
+  .os-card { padding: 28px 18px 26px; }
+  .os-meta { grid-template-columns: 1fr; }
+}
+
