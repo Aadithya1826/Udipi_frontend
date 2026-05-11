@@ -4,11 +4,15 @@ const { Pool } = require('pg');
 require('dotenv').config();
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const path = require('path');
 const app = express();
 const port = 5000;
 
 app.use(cors());
 app.use(express.json());
+
+// Serve static files (images)
+app.use('/static', express.static(path.join(__dirname, '../static')));
 
 const pool = new Pool({
   host: 'banking-db.cnkegcm24ikf.ap-south-2.rds.amazonaws.com',

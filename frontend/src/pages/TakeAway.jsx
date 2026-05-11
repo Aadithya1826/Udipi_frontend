@@ -117,7 +117,7 @@ export default function TakeAway() {
             name: item.name,
             tamilName: item.name, // Fallback to english if tamil not available
             price: Number(item.price),
-            image: item.image_url,
+            image: item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `http://localhost:5000${item.image_url}`) : null,
             description: item.description,
             tamilDesc: item.description,
             available: item.is_available,

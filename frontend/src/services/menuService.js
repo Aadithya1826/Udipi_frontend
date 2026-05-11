@@ -49,7 +49,7 @@ export function formatMenuData(dbCategories, dbItems) {
       name: item.name,
       tamilName: item.name,
       price: Number(item.price),
-      image: item.image_url || null,
+      image: item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `${API_BASE}${item.image_url}`) : null,
       description: item.description || '',
       tamilDesc: item.description || '',
       available: item.is_available,
