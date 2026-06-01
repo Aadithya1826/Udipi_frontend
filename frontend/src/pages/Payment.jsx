@@ -16,7 +16,8 @@ const Payment = () => {
     subtotal,
     serviceCharge,
     gst,
-    totalAmount: total
+    totalAmount: total,
+    tableNumber
   } = useCart();
 
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -34,10 +35,10 @@ const Payment = () => {
   const handleConfirm = async () => {
     setIsCartOpen(false);
 
-    if (selectedMethod === 'Cash') {
+    if (selectedMethod === 'Cash' || selectedMethod === 'UPI') {
       const orderData = {
-        table_number: '06',
-        payment_method: 'Cash',
+        table_number: tableNumber,
+        payment_method: selectedMethod,
         phone: formData.phone || '',
         cart: cart.map(item => ({
           id: item.id,
@@ -52,17 +53,19 @@ const Payment = () => {
       };
 
       try {
-        await fetch('http://localhost:5000/api/orders', {
+        const res = await fetch('http://127.0.0.1:8000/api/v1/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(orderData)
-        }).catch(err => console.warn('Backend not available:', err));
+        });
+        const data = await res.json();
+        const generatedOrderId = data.id || `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
 
         navigate('/order-success', {
           state: {
-            orderId: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
+            orderId: generatedOrderId,
             cartData: cart,
-            subtotal, gst, total, formData, paymentMethod: 'Cash'
+            subtotal, gst, total, formData, paymentMethod: selectedMethod
           }
         });
       } catch (err) {
@@ -71,7 +74,7 @@ const Payment = () => {
           state: {
             orderId: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
             cartData: cart,
-            subtotal, gst, total, formData, paymentMethod: 'Cash'
+            subtotal, gst, total, formData, paymentMethod: selectedMethod
           }
         });
       }
@@ -79,7 +82,7 @@ const Payment = () => {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/create-razorpay-order', {
+      const res = await fetch('http://127.0.0.1:8000/api/v1/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: total })
@@ -96,7 +99,7 @@ const Payment = () => {
         description: 'Food Order Payment',
         order_id: order.id,
         handler: async function (response) {
-          const verifyRes = await fetch('http://localhost:5000/api/verify-payment', {
+          const verifyRes = await fetch('http://127.0.0.1:8000/api/v1/payments/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -124,7 +127,7 @@ const Payment = () => {
               total_amount: total
             };
 
-            await fetch('http://localhost:5000/api/orders', {
+            await fetch('http://127.0.0.1:8000/api/v1/orders', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(orderData)
@@ -166,7 +169,7 @@ const Payment = () => {
   return (
     <div className="payment-page">
       <div className="payment-bg" />
-      <Header tableNumber="06" showFullHeader={true} useTitleImage={true} showDateTime={true} />
+      <Header tableNumber={tableNumber} showFullHeader={true} useTitleImage={true} showDateTime={true} />
 
       <main className="payment-main">
         <div className="payment-card">
@@ -266,11 +269,11 @@ const Payment = () => {
           <div className="di-cart-header">
             <div className="di-cart-header-left">
               <span className="di-cart-title">Cart</span>
-              <span className="di-cart-table-pill">Table No : 06 <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
+              <span className="di-cart-table-pill">Table No : {tableNumber} <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
             </div>
             <button className="di-cart-close" onClick={() => setIsCartOpen(false)}>✕</button>
           </div>
-          <div className="di-cart-order-id"># Order ID : 2002</div>
+          <div className="di-cart-order-id"># New Order</div>
 
           <div className="di-order-type-tabs">
             <button className="di-ot-tab active"><i className="fa-solid fa-utensils" /> Dine In</button>

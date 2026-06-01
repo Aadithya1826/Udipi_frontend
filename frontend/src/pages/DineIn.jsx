@@ -68,7 +68,8 @@ export default function DineIn() {
     changeQty,
     updateNote,
     totalItems,
-    subtotal: totalAmount
+    subtotal: totalAmount,
+    tableNumber
   } = useCart()
 
   const [activeCategory, setActiveCategory] = useState('all')
@@ -92,10 +93,10 @@ export default function DineIn() {
     // Fetch menu data from backend
     async function fetchMenuData() {
       try {
-        const catRes = await fetch('http://localhost:5000/api/categories');
+        const catRes = await fetch('http://127.0.0.1:8000/api/v1/public/menu/categories');
         const dbCategories = await catRes.json();
         
-        const itemRes = await fetch('http://localhost:5000/api/items');
+        const itemRes = await fetch('http://127.0.0.1:8000/api/v1/public/menu/items');
         const dbItems = await itemRes.json();
 
         const formattedCategories = [
@@ -117,7 +118,7 @@ export default function DineIn() {
             name: item.name,
             tamilName: item.name, // Fallback to english if tamil not available
             price: Number(item.price),
-            image: item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `http://localhost:5000${item.image_url}`) : null,
+            image: item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `http://127.0.0.1:8000${item.image_url}`) : null,
             description: item.description,
             tamilDesc: item.description,
             available: item.is_available,
@@ -154,7 +155,7 @@ export default function DineIn() {
   return (
     <div className="app-container">
       <div className="background-image" />
-      <Header tableNumber="06" showFullHeader={true} useTitleImage={true} />
+      <Header tableNumber={tableNumber} showFullHeader={true} useTitleImage={true} />
 
       <main className="di-main">
         <div className="di-seg-top">
@@ -214,11 +215,11 @@ export default function DineIn() {
           <div className="di-cart-header">
             <div className="di-cart-header-left">
               <span className="di-cart-title">{t('cart') || 'Cart'}</span>
-              <span className="di-cart-table-pill">{t('tableNo')} 06 <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
+              <span className="di-cart-table-pill">{t('tableNo')} {tableNumber} <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
             </div>
             <button className="di-cart-close" onClick={() => setIsCartOpen(false)}>✕</button>
           </div>
-          <div className="di-cart-order-id"># Order ID : 2002</div>
+          <div className="di-cart-order-id"># New Order</div>
 
           <div className="di-order-type-tabs">
             <button className="di-ot-tab active" style={{ width: '100%' }}><i className="fa-solid fa-utensils" /> {t('dineIn')}</button>

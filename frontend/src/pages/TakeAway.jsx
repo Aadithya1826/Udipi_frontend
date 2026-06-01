@@ -92,10 +92,10 @@ export default function TakeAway() {
     // Fetch menu data from backend
     async function fetchMenuData() {
       try {
-        const catRes = await fetch('http://localhost:5000/api/categories');
+        const catRes = await fetch('http://127.0.0.1:8000/api/v1/public/menu/categories');
         const dbCategories = await catRes.json();
         
-        const itemRes = await fetch('http://localhost:5000/api/items');
+        const itemRes = await fetch('http://127.0.0.1:8000/api/v1/public/menu/items');
         const dbItems = await itemRes.json();
 
         const formattedCategories = [
@@ -117,7 +117,7 @@ export default function TakeAway() {
             name: item.name,
             tamilName: item.name, // Fallback to english if tamil not available
             price: Number(item.price),
-            image: item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `http://localhost:5000${item.image_url}`) : null,
+            image: item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `http://127.0.0.1:8000${item.image_url}`) : null,
             description: item.description,
             tamilDesc: item.description,
             available: item.is_available,
@@ -212,7 +212,7 @@ export default function TakeAway() {
             </div>
             <button className="di-cart-close" onClick={() => setIsCartOpen(false)}>✕</button>
           </div>
-          <div className="di-cart-order-id"># Order ID : 2002</div>
+          <div className="di-cart-order-id"># New Order</div>
 
           <div className="di-order-type-tabs">
             <button className="di-ot-tab active" style={{ width: '100%' }}><i className="fa-solid fa-bag-shopping" /> {t('takeAway')}</button>

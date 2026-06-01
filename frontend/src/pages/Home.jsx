@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
+import { useCart } from '../context/CartContext'
 import Header from '../components/Header'
 import Footer from '../components/Footer'
 import '../styles/home.css'
 
 function Home() {
-  const [tableNumber, setTableNumber] = useState('06')
   const navigate = useNavigate()
   const { t } = useLanguage()
+  const { tableNumber } = useCart()
 
   return (
     <div className="app-container home-page-container">
       <div className="background-image"></div>
-      <Header tableNumber="06" showFullHeader={true} useTitleImage={false} showDateTime={false} />
+      <Header tableNumber={tableNumber} showFullHeader={true} useTitleImage={false} showDateTime={false} />
       
       <main className="main-content">
         <h2 className="welcome-text">{t('welcome')}</h2>

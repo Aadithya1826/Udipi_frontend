@@ -6,22 +6,10 @@ import './AIAssistantOverlay.css';
 
 const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isCartOpen, setIsCartOpen, onPhoneUpdate }) => {
   const { language, t } = useLanguage();
-  const { cart, setCart, addToCart, changeQty, removeCartItem, updateNote } = useCart();
+  const { cart, setCart, addToCart, changeQty, removeCartItem, updateNote, tableNumber } = useCart();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
-
-  // Persist position in localStorage (v2 = centered-right default)
-  const POS_VERSION = 'v2';
-  const rawPos = JSON.parse(localStorage.getItem('ai-assistant-pos'));
-  const savedPos = (rawPos && rawPos._v === POS_VERSION) ? rawPos : { x: window.innerWidth - 130, y: Math.floor(window.innerHeight / 2) - 45, _v: POS_VERSION };
-  const [position, setPosition] = useState(savedPos);
-
-  const [isDragging, setIsDragging] = useState(false);
-  const dragRef = useRef(null);
-  const offsetRef = useRef({ active: false, x: 0, y: 0 });
-  const [canMove, setCanMove] = useState(false);
-  const startPosRef = useRef({ x: 0, y: 0 });
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -328,51 +316,6 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
       return;
     }
 
-    // --- GREEDY ITEM SCAN FALLBACK ---
-    // If no explicit add/remove was handled, scan the whole text for any item name or keyword
-    let mentionedItem = null;
-    const words = normalizedText.split(/\s+/).filter(w => w.length > 3);
-
-    // First pass: look for exact name matches within the text
-    menuItems?.forEach(item => {
-      if (normalizedText.includes(item.name.toLowerCase()) || (item.tamilName && normalizedText.includes(item.tamilName.toLowerCase()))) {
-        mentionedItem = item;
-      }
-    });
-
-    // Second pass: if no exact name match, look for keyword matches (e.g., "dosa" matching "Onion Rava Dosa")
-    if (!mentionedItem) {
-      menuItems?.forEach(item => {
-        const itemNameLower = item.name.toLowerCase();
-        const tamilNameLower = item.tamilName ? item.tamilName.toLowerCase() : '';
-        if (words.some(word => itemNameLower.includes(word) || (tamilNameLower && tamilNameLower.includes(word)))) {
-          mentionedItem = item;
-        }
-      });
-    }
-
-    if (mentionedItem) {
-      addToCart(mentionedItem);
-
-      const baseResponse = getRandomResponse(language === 'Tamil' && mentionedItem.tamilName ? mentionedItem.tamilName : mentionedItem.name);
-      // Smart Suggestion
-      let suggestion = "";
-      if (mentionedItem.name.toLowerCase().includes('dosa')) {
-        suggestion = language === 'Tamil'
-          ? " தோசையுடன் எங்களின் ஃபில்டர் காபி மிகவும் நன்றாக இருக்கும். முயற்சிக்கிறீர்களா?"
-          : " A Filter Coffee would pair beautifully with your dosa. Would you like to try it?";
-      } else if (mentionedItem.name.toLowerCase().includes('idly')) {
-        suggestion = language === 'Tamil'
-          ? " அடுத்து எங்களின் நெய் பொடி இட்லியை முயற்சிக்க விரும்புகிறீர்களா?"
-          : " Would you like to try our Ghee Podi Idly next?";
-      }
-
-      const confirmMsg = baseResponse + suggestion;
-      setMessages(prev => [...prev, { role: 'model', content: confirmMsg }]);
-      speakText(confirmMsg);
-      setIsLoading(false);
-      return;
-    }
 
     const menuContext = `
     AVAILABLE CATEGORIES: ${menuCategories.map(c => c.name).join(', ')}.
@@ -387,47 +330,60 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
     - North Indian: Paneer Butter Masala, Butter Nan, Malai Koftha
     `;
 
-    const systemPrompt = `You are the Voice AI Assistant for Data Udipi, a world-class premium vegetarian restaurant.
-    ROLE: Continuous, intelligent restaurant host who assists the customer throughout their entire journey.
-    PERSONALITY: Warm, welcoming, knowledgeable, premium restaurant steward with a friendly South Indian touch.
-    TONE: Polite, enthusiastic, natural Indian-accented English. Short, meaningful sentences.
-
-    CRITICAL: Keep responses extremely concise and under 15 words for maximum speed.
-
-    MENU KNOWLEDGE:
-    ${menuContext}
-
-    GLOBAL BEHAVIOR:
-    - Greet with "Vanakkam!" at the start.
-    - Guide browsing and answer menu questions clearly.
-    - Acknowledge additions positively: "Great choice! I've added [Item] to your order."
-    - Real-time Awareness: You know the cart has ${cart.length} items totaling Rs. ${cart.reduce((s, i) => s + i.price * i.quantity, 0)}.
-    - Smart Suggestions: Suggest Filter Coffee with Dosa, or Ghee Podi Idly.
-    - Phonetic Awareness: Be extremely flexible with pronunciations (e.g., "sambal Italy" -> "Sambar Idly").
-    - Assist during checkout and thank them at the end.
-
-    LANGUAGE INSTRUCTIONS:
-    - The current application language is ${language}.
-    - CRITICAL: If language is 'Tamil', you are a TAMIL WAITER (Lady Voice). You MUST respond ONLY in Tamil, even if the user speaks to you in English.
-    - If language is 'English', you are a premium restaurant steward. You MUST respond ONLY in English.
-    - DO NOT provide translations or bilingual text. Stick to the chosen language: ${language}.
-    - Use polite, natural phrases and correct food names for the active language.
-
-    CART CONTEXT: ${cartContext}
-    `;
+    const systemPrompt = "You are a restaurant ordering assistant for Data Udipi.\n" +
+    "Your job is to classify any user input into one of these intents:\n" +
+    "- Greeting\n" +
+    "- Confirmation (yes/ok/sure variations)\n" +
+    "- Negative (no/not now variations)\n" +
+    "- Menu Query (food items like dosa, idly, rice, beverages)\n" +
+    "- Payment\n" +
+    "- Fallback (anything outside restaurant scope)\n\n" +
+    "Rules:\n" +
+    "1. Always detect the intent, even if the wording is unusual.\n" +
+    "2. Use conversation state to decide the response:\n" +
+    "   - GREETING + Confirmation -> Show menu specials.\n" +
+    "   - MENU_SELECTION + Confirmation -> Ask for next item.\n" +
+    "   - ORDER_CONFIRMATION + Negative -> Move to payment.\n" +
+    "   - PAYMENT + Confirmation -> Trigger checkout.\n" +
+    "3. If intent confidence is low -> Use fallback response:\n" +
+    "   \"I can help with our menu and orders. Would you like to see our specials?\"\n" +
+    "4. Never repeat the same response for 'yes' blindly — adapt based on state.\n\n" +
+    "MENU KNOWLEDGE:\n" +
+    menuContext + "\n\n" +
+    "GLOBAL BEHAVIOR:\n" +
+    "- Greet with \"Vanakkam!\" at the start.\n" +
+    "- If the user mentions an item but doesn't say to add it, ask: \"Would you like me to add [Item] to your cart?\"\n" +
+    "- Smart Suggestions: Suggest Filter Coffee with Dosa, or Ghee Podi Idly.\n" +
+    "- Phonetic Awareness: Be extremely flexible with pronunciations (e.g., \"sambal Italy\" -> \"Sambar Idly\").\n" +
+    "- If the user confirms they want to order an item, add it by including the exact token: [ADD_ITEM: Exact Item Name]\n" +
+    "- If the user explicitly asks to checkout, say \"Sure! Taking you to the checkout page now.\" and include the exact token: [CHECKOUT_NOW]\n" +
+    "- If the user explicitly asks to see the menu, say \"Taking you to the menu.\" and include the exact token: [SHOW_MENU]\n\n" +
+    "LANGUAGE INSTRUCTIONS:\n" +
+    "- The current application language is " + language + ".\n" +
+    "- CRITICAL: If language is 'Tamil', you are a TAMIL WAITER (Lady Voice). You MUST respond ONLY in Tamil, even if the user speaks to you in English.\n" +
+    "- If language is 'English', you are a premium restaurant steward. You MUST respond ONLY in English.\n" +
+    "- DO NOT provide translations or bilingual text. Stick to the chosen language: " + language + ".\n" +
+    "- Use polite, natural phrases and correct food names for the active language.\n\n" +
+    "CART CONTEXT: " + cartContext;
 
     try {
-      const response = await fetch('/api/chat', {
+      const apiMessages = messages.map(m => ({
+        role: m.role === 'model' ? 'model' : 'user',
+        parts: [{ text: m.content }]
+      }));
+      apiMessages.push({ role: 'user', parts: [{ text }] });
+
+      const response = await fetch('http://127.0.0.1:8000/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text }] }],
+          contents: apiMessages,
           systemInstruction: {
             parts: [{ text: systemPrompt }]
           },
           generationConfig: {
             temperature: 1.0,
-            maxOutputTokens: 150,
+            maxOutputTokens: 500,
           }
         })
       });
@@ -439,10 +395,34 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
         let botText = data.candidates[0].content.parts[0].text;
 
         // Handle Action Tokens
+        if (botText.includes('[ADD_ITEM:')) {
+          const addMatch = botText.match(/\[ADD_ITEM:\s*([^\]]+)\]/i);
+          if (addMatch) {
+            const itemName = addMatch[1].trim().toLowerCase();
+            let foundItem = menuItems?.find(i => 
+              i.name.toLowerCase().includes(itemName) || 
+              (i.tamilName && i.tamilName.toLowerCase().includes(itemName))
+            );
+            if (foundItem) addToCart(foundItem);
+          }
+          botText = botText.replace(/\[ADD_ITEM:[^\]]+\]/gi, '').trim();
+        }
+
         if (botText.includes('[SHOW_MENU]')) {
           botText = botText.replace('[SHOW_MENU]', '').trim();
-          // Logic to show menu (e.g. via parent state if passed, or just a message)
-          console.log("AI requested to show menu");
+          setTimeout(() => {
+            setIsOpen(false);
+            navigate(location.pathname.includes('takeaway') || location.pathname.includes('take-away') ? '/take-away' : '/dine-in');
+          }, 1500);
+        }
+
+        if (botText.includes('[CHECKOUT_NOW]')) {
+          botText = botText.replace('[CHECKOUT_NOW]', '').trim();
+          setTimeout(() => {
+            setIsCartOpen(false);
+            setIsOpen(false);
+            navigate(location.pathname.includes('takeaway') || location.pathname.includes('take-away') ? '/takeaway-checkout' : '/checkout');
+          }, 1500);
         }
 
         setMessages(prev => [...prev, { role: 'model', content: botText }]);
@@ -472,87 +452,8 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
     return () => clearTimeout(timer);
   }, [messages, isLoading, cart]);
 
-  useEffect(() => {
-    localStorage.setItem('ai-assistant-pos', JSON.stringify(position));
-  }, [position]);
-
   const toggleSidebar = () => {
-    if (canMove || isDragging) return;
     setIsOpen(!isOpen);
-  };
-
-  const handleDoubleClick = (e) => {
-    e.preventDefault();
-    setCanMove(true);
-  };
-
-  // Draggable logic
-  useEffect(() => {
-    const handleMove = (e) => {
-      if (offsetRef.current.active && canMove) {
-        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-        const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-
-        const dx = clientX - startPosRef.current.x;
-        const dy = clientY - startPosRef.current.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance > 2) {
-          setIsDragging(true);
-        }
-
-        if (isDragging || distance > 2) {
-          let newX = clientX - offsetRef.current.x;
-          let newY = clientY - offsetRef.current.y;
-
-          // Bounds checking
-          const padding = 10;
-          newX = Math.max(padding, Math.min(newX, window.innerWidth - 100));
-          newY = Math.max(padding, Math.min(newY, window.innerHeight - 100));
-
-          setPosition({ x: newX, y: newY });
-        }
-      }
-    };
-
-    const handleEnd = () => {
-      if (offsetRef.current.active) {
-        offsetRef.current.active = false;
-        if (isDragging) {
-          setCanMove(false); // Lock it back after drag
-          setTimeout(() => setIsDragging(false), 100);
-        }
-      }
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleEnd);
-      window.removeEventListener('touchmove', handleMove);
-      window.removeEventListener('touchend', handleEnd);
-    };
-
-    if (offsetRef.current.active && canMove) {
-      window.addEventListener('mousemove', handleMove);
-      window.addEventListener('mouseup', handleEnd);
-      window.addEventListener('touchmove', handleMove, { passive: false });
-      window.addEventListener('touchend', handleEnd);
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleEnd);
-      window.removeEventListener('touchmove', handleMove);
-      window.removeEventListener('touchend', handleEnd);
-    };
-  }, [isDragging, canMove]);
-
-  const onMouseDown = (e) => {
-    if (e.button !== 0 || !canMove) return;
-
-    startPosRef.current = { x: e.clientX, y: e.clientY };
-    offsetRef.current = {
-      active: true,
-      x: e.clientX - position.x,
-      y: e.clientY - position.y
-    };
   };
 
   const quickActions = [
@@ -564,12 +465,10 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
 
   return (
     <>
-      {/* Draggable Trigger Button */}
+      {/* Fixed Trigger Button */}
       {!isOpen && (
         <div
-          className={`ai-trigger-btn ${canMove ? 'move-mode' : ''}`}
-          onMouseDown={onMouseDown}
-          onDoubleClick={handleDoubleClick}
+          className="ai-trigger-btn"
           onMouseEnter={() => {
             const hoverMsg = language === 'Tamil'
               ? "வணக்கம்! நான் உங்கள் குரல் உதவியாளர். உங்களுக்கு இன்று நான் எப்படி உதவ முடியும்?"
@@ -577,26 +476,13 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
             speakText(hoverMsg);
           }}
           onMouseLeave={() => window.speechSynthesis.cancel()}
-          onTouchStart={(e) => {
-            if (!canMove) return;
-            const touch = e.touches[0];
-            onMouseDown({
-              preventDefault: () => { },
-              clientX: touch.clientX,
-              clientY: touch.clientY,
-              button: 0
-            });
-          }}
           onClick={toggleSidebar}
           style={{
-            transform: `translate3d(${position.x}px, ${position.y}px, 0)`,
-            left: 0,
-            top: 0,
-            cursor: canMove ? (isDragging ? 'grabbing' : 'move') : 'pointer',
-            touchAction: 'none',
-            transition: isDragging ? 'none' : 'transform 0.5s cubic-bezier(0.19, 1, 0.22, 1)'
+            top: '120px',
+            right: '20px',
+            cursor: 'pointer'
           }}
-          title={canMove ? "Drag to move" : "Double-click to unlock movement"}
+          title="Talk to Voice Agent"
         >
           <img src="/agentwaiter logo.png" alt="Agent" style={{ pointerEvents: 'none', userSelect: 'none' }} />
           <div className="ai-hover-tooltip">
@@ -607,12 +493,11 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
               {language === 'Tamil' ? 'இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்?' : 'How can I help you today?'}
             </div>
           </div>
-          {canMove && <div className="ai-move-indicator">MOVABLE</div>}
         </div>
       )}
 
       {/* "Original" Style AI Sidebar */}
-      <div className={`ai-sidebar-overlay ${isOpen ? 'active' : ''} moved-down`}>
+      <div className={["ai-sidebar-overlay", isOpen ? 'active' : '', "moved-down"].join(' ')}>
         <div className="ai-sidebar-content-original">
           {/* ── Frosted Hero Section ── */}
           <div className="ai-hero-frosted-original">
@@ -643,13 +528,13 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
             flexDirection: 'column',
             gap: '15px'
           }}>
-            <style>{`.ai-chat-messages::-webkit-scrollbar { display: none; }`}</style>
+            <style>{".ai-chat-messages::-webkit-scrollbar { display: none; }"}</style>
             {/* ── My Orders Section (Now Integrated inside Chat area) ── */}
             {cart.length > 0 && (
               <div className="ai-orders-section" style={{ padding: '20px 0' }}>
                 <div className="ai-orders-header">
                   <span className="ai-orders-title">My Orders</span>
-                  <span className="ai-table-pill">Table No : 06 <i className="fa-solid fa-chevron-down" /></span>
+                  <span className="ai-table-pill">Table No : {tableNumber} <i className="fa-solid fa-chevron-down" /></span>
                 </div>
 
                 <div className="ai-order-tabs">
@@ -702,7 +587,7 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
               </div>
             ) : (
               (cart.length > 0 ? (messages.length > 0 ? [messages[messages.length - 1]] : []) : messages).filter(Boolean).map((msg, i) => (
-                <div key={i} className={`ai-msg-container ${msg?.role}`} style={{
+                <div key={i} className={["ai-msg-container", msg?.role].join(' ')} style={{
                   display: 'flex',
                   alignItems: 'flex-start',
                   gap: '12px',
@@ -816,7 +701,7 @@ const AIAssistantOverlay = ({ navigate, menuItems = [], menuCategories = [], isC
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
               />
-              <button className={`ai-mic-small ${isListening ? 'listening' : ''}`} onClick={toggleListen}>
+              <button className={["ai-mic-small", isListening ? 'listening' : ''].join(' ')} onClick={toggleListen}>
                 <i className="fa-solid fa-microphone-lines"></i>
               </button>
             </div>

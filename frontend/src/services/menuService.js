@@ -1,19 +1,19 @@
-const API_BASE = 'http://localhost:5000';
+const API_BASE = 'http://127.0.0.1:8000';
 
 export async function fetchCategories() {
-  const res = await fetch(`${API_BASE}/api/categories`);
+  const res = await fetch(`${API_BASE}/api/v1/public/menu/categories`);
   if (!res.ok) throw new Error('Failed to fetch categories');
   return res.json();
 }
 
 export async function fetchItems() {
-  const res = await fetch(`${API_BASE}/api/items`);
+  const res = await fetch(`${API_BASE}/api/v1/public/menu/items`);
   if (!res.ok) throw new Error('Failed to fetch items');
   return res.json();
 }
 
 export async function placeOrder(orderData) {
-  const res = await fetch(`${API_BASE}/api/orders`, {
+  const res = await fetch(`${API_BASE}/api/v1/orders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(orderData),

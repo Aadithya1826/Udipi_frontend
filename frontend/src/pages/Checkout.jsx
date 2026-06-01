@@ -17,7 +17,8 @@ const Checkout = () => {
     subtotal,
     serviceCharge,
     gst,
-    totalAmount
+    totalAmount,
+    tableNumber
   } = useCart();
 
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -89,7 +90,7 @@ const Checkout = () => {
       <div className="checkout-bg" />
 
       {/* Shared Header */}
-      <Header tableNumber="06" showFullHeader={true} useTitleImage={true} showDateTime={true} />
+      <Header tableNumber={tableNumber} showFullHeader={true} useTitleImage={true} showDateTime={true} />
 
       {/* Floating card */}
       <main className="checkout-main">
@@ -202,11 +203,11 @@ const Checkout = () => {
           <div className="di-cart-header">
             <div className="di-cart-header-left">
               <span className="di-cart-title">Cart</span>
-              <span className="di-cart-table-pill">Table No : 06 <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
+              <span className="di-cart-table-pill">Table No : {tableNumber} <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
             </div>
             <button className="di-cart-close" onClick={() => setIsCartOpen(false)}>✕</button>
           </div>
-          <div className="di-cart-order-id"># Order ID : 2002</div>
+          <div className="di-cart-order-id"># New Order</div>
 
           <div className="di-order-type-tabs">
             <button className="di-ot-tab active"><i className="fa-solid fa-utensils" /> Dine In</button>

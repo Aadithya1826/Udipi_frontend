@@ -34,10 +34,10 @@ const TakeAwayPayment = () => {
   const handleConfirm = async () => {
     setIsCartOpen(false);
 
-    if (selectedMethod === 'Cash') {
+    if (selectedMethod === 'Cash' || selectedMethod === 'UPI') {
       const orderData = {
         table_number: 'TakeAway',
-        payment_method: 'Cash',
+        payment_method: selectedMethod,
         phone: formData.phone || '',
         cart: cart.map(item => ({
           id: item.id,
@@ -52,17 +52,19 @@ const TakeAwayPayment = () => {
       };
 
       try {
-        await fetch('http://localhost:5000/api/orders', {
+        const res = await fetch('http://127.0.0.1:8000/api/v1/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(orderData)
-        }).catch(err => console.warn('Backend not available:', err));
+        });
+        const data = await res.json();
+        const generatedOrderId = data.id || `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
 
         navigate('/takeaway-order-success', {
           state: {
-            orderId: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
+            orderId: generatedOrderId,
             cartData: cart,
-            subtotal, gst, total, formData, paymentMethod: 'Cash'
+            subtotal, gst, total, formData, paymentMethod: selectedMethod
           }
         });
       } catch (err) {
@@ -71,7 +73,7 @@ const TakeAwayPayment = () => {
           state: {
             orderId: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
             cartData: cart,
-            subtotal, gst, total, formData, paymentMethod: 'Cash'
+            subtotal, gst, total, formData, paymentMethod: selectedMethod
           }
         });
       }
@@ -79,7 +81,7 @@ const TakeAwayPayment = () => {
     }
 
     try {
-      const res = await fetch('http://localhost:5000/api/create-razorpay-order', {
+      const res = await fetch('http://127.0.0.1:8000/api/v1/payments/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: total })
@@ -96,7 +98,7 @@ const TakeAwayPayment = () => {
         description: 'Food Order Payment',
         order_id: order.id,
         handler: async function (response) {
-          const verifyRes = await fetch('http://localhost:5000/api/verify-payment', {
+          const verifyRes = await fetch('http://127.0.0.1:8000/api/v1/payments/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -124,7 +126,7 @@ const TakeAwayPayment = () => {
               total_amount: total
             };
 
-            await fetch('http://localhost:5000/api/orders', {
+            await fetch('http://127.0.0.1:8000/api/v1/orders', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(orderData)
@@ -269,7 +271,7 @@ const TakeAwayPayment = () => {
             </div>
             <button className="di-cart-close" onClick={() => setIsCartOpen(false)}>✕</button>
           </div>
-          <div className="di-cart-order-id"># Order ID : 2002</div>
+          <div className="di-cart-order-id"># New Order</div>
 
           <div className="di-order-type-tabs">
             <button className="di-ot-tab" onClick={() => navigate('/dine-in')}><i className="fa-solid fa-utensils" /> Dine In</button>

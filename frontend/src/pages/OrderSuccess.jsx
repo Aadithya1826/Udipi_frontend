@@ -8,7 +8,7 @@ import '../styles/ordersuccess.css';
 const OrderSuccess = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { clearCart } = useCart();
+  const { clearCart, tableNumber } = useCart();
   const {
     cartData = [],
     subtotal = 0,
@@ -57,7 +57,7 @@ const OrderSuccess = () => {
   return (
     <div className="os-page">
       <div className="os-bg" />
-      <Header tableNumber="06" showFullHeader={true} useTitleImage={true} showDateTime={true} />
+      <Header tableNumber={tableNumber} showFullHeader={true} useTitleImage={true} showDateTime={true} />
 
       <main className="os-main">
         <div className="os-card">
@@ -81,7 +81,7 @@ const OrderSuccess = () => {
             </div>
             <div className="os-meta-item">
               <span className="os-meta-label">Table</span>
-              <span className="os-meta-value">No. {formData.table || '06'}</span>
+              <span className="os-meta-value">No. {formData.table || tableNumber || '06'}</span>
             </div>
             <div className="os-meta-item">
               <span className="os-meta-label">Payment</span>

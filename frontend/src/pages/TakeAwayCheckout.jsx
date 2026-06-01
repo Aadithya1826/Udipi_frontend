@@ -205,7 +205,7 @@ const TakeAwayCheckout = () => {
             </div>
             <button className="di-cart-close" onClick={() => setIsCartOpen(false)}>✕</button>
           </div>
-          <div className="di-cart-order-id"># Order ID : 2002</div>
+          <div className="di-cart-order-id"># New Order</div>
 
           <div className="di-order-type-tabs">
             <button className="di-ot-tab" onClick={() => navigate('/dine-in')}><i className="fa-solid fa-utensils" /> Dine In</button>

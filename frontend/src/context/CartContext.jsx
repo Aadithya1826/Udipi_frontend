@@ -8,6 +8,21 @@ export const CartProvider = ({ children }) => {
   const isTakeaway = location.pathname.includes('takeaway') || location.pathname.includes('take-away');
   const cartKey = isTakeaway ? 'takeaway' : 'dinein';
 
+  const [tableNumber, setTableNumber] = useState(() => {
+    const saved = localStorage.getItem('active_table_number') || '06';
+    return saved.replace(/\D/g, '');
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tableParam = params.get('table');
+    if (tableParam) {
+      const cleanTable = tableParam.replace(/\D/g, '');
+      localStorage.setItem('active_table_number', cleanTable);
+      setTableNumber(cleanTable);
+    }
+  }, [location.search]);
+
   const [carts, setCarts] = useState(() => {
     const saved = localStorage.getItem('udipi_carts_v2');
     return saved ? JSON.parse(saved) : { dinein: [], takeaway: [] };
@@ -84,6 +99,8 @@ export const CartProvider = ({ children }) => {
         serviceCharge,
         gst,
         totalAmount,
+        tableNumber,
+        setTableNumber,
       }}
     >
       {children}
