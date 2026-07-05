@@ -46,7 +46,7 @@ const AIAssistantOverlay = () => {
       }
     }
     fetchMenu();
-  }, []);
+  }, [location.pathname]);
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -232,7 +232,11 @@ const AIAssistantOverlay = () => {
       'italy': 'idly',
       'sambal': 'sambar',
       'dose': 'dosa',
-      'vada': 'vadai'
+      'vada': 'vadai',
+      'gajraitha': 'veg raitha',
+      'order part': 'order pannu',
+      'part': 'pannu',
+      'yeh baadi': 'vadai'
     };
 
     let normalizedText = lowerText;
@@ -240,7 +244,8 @@ const AIAssistantOverlay = () => {
       normalizedText = normalizedText.replace(new RegExp(wrong, 'g'), right);
     });
 
-    const userMessage = { role: 'user', content: text };
+    const messageId = Date.now();
+    const userMessage = { id: messageId, role: 'user', content: normalizedText };
     setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsLoading(true);
@@ -312,12 +317,22 @@ const AIAssistantOverlay = () => {
       setIsCartOpen(false);
       setIsOpen(false);
 
-      if (location.pathname.includes('payment') && normalizedText.match(/(place order|confirm order|pay|payment)/i)) {
+      if (location.pathname.includes('payment') && normalizedText.match(/(place order|confirm order|pay|payment|ok|done)/i)) {
+         const isPaymentMethod = normalizedText.match(/(cash|upi|online|card|paytm|gpay|phonepe)/i);
+         let method;
+         if (isPaymentMethod) {
+           method = normalizedText.match(/(cash)/i) ? 'Cash' : 'UPI';
+           document.dispatchEvent(new CustomEvent('select-payment', { detail: { method } }));
+         }
+         
+         // If they said "online payment", "ok with cash", "confirm order", etc.
+         // Wait, if they just said "cash" alone (without ok/confirm/pay/payment), the top regex won't catch it unless they say "pay cash".
+         // Let's make sure it handles both.
          const msg = language === 'Tamil' ? "ஆர்டர் செய்யப்படுகிறது." : "Placing your order.";
          setMessages(prev => [...prev, { role: 'model', content: msg }]);
          speakText(msg);
          setTimeout(() => {
-            document.dispatchEvent(new CustomEvent('confirm-place-order'));
+            document.dispatchEvent(new CustomEvent('confirm-place-order', { detail: { method } }));
          }, 1000);
          setIsLoading(false);
          return;
@@ -385,13 +400,24 @@ const AIAssistantOverlay = () => {
        // Let Gemini handle it.
     }
 
-    // --- Voice Command: Payment Selection ---
+    // --- Voice Command: Payment Selection (Only selection, no confirmation) ---
     if (normalizedText.match(/(cash|upi|online|card|paytm|gpay|phonepe)/i)) {
       const method = normalizedText.match(/(cash)/i) ? 'Cash' : 'UPI';
       document.dispatchEvent(new CustomEvent('select-payment', { detail: { method } }));
-      const confirmMsg = language === 'Tamil' ? `${method} தேர்ந்தெடுக்கப்பட்டது. தயவுசெய்து 'ஆர்டர் செய்' என்று கூறவும்.` : `Selected ${method}. Say 'Place order' to confirm.`;
-      setMessages(prev => [...prev, { role: 'model', content: confirmMsg }]);
-      speakText(confirmMsg);
+      
+      if (location.pathname.includes('payment') && (method === 'UPI' || normalizedText.match(/(ok|place|confirm|done)/i))) {
+         // Auto confirm for online payment or if they said ok
+         const confirmMsg = language === 'Tamil' ? "ஆர்டர் செய்யப்படுகிறது." : "Placing your order.";
+         setMessages(prev => [...prev, { role: 'model', content: confirmMsg }]);
+         speakText(confirmMsg);
+         setTimeout(() => {
+            document.dispatchEvent(new CustomEvent('confirm-place-order', { detail: { method } }));
+         }, 1000);
+      } else {
+         const confirmMsg = language === 'Tamil' ? `${method} தேர்ந்தெடுக்கப்பட்டது. தயவுசெய்து 'ஆர்டர் செய்' என்று கூறவும்.` : `Selected ${method}. Say 'Place order' to confirm.`;
+         setMessages(prev => [...prev, { role: 'model', content: confirmMsg }]);
+         speakText(confirmMsg);
+      }
       setIsLoading(false);
       return;
     }
@@ -443,7 +469,12 @@ const AIAssistantOverlay = () => {
 
       const data = await response.json();
       if (data.candidates && data.candidates[0]) {
-        let rawResponse = data.candidates[0].content.parts[0].text;
+        const candidate = data.candidates[0];
+        if (!candidate.content || !candidate.content.parts || !candidate.content.parts[0]) {
+          console.warn("AI response blocked or empty:", candidate);
+          throw new Error("AI response was empty or blocked by safety filters.");
+        }
+        let rawResponse = candidate.content.parts[0].text;
         rawResponse = rawResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
         
         let aiResponse;
@@ -455,6 +486,10 @@ const AIAssistantOverlay = () => {
             speech: language === 'Tamil' ? "மன்னிக்கவும், எனக்கு சரியாக புரியவில்லை. மீண்டும் கூற முடியுமா?" : "Sorry, I missed that. Could you please repeat?", 
             action: null 
           };
+        }
+
+        if (aiResponse.corrected_transcript) {
+           setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: aiResponse.corrected_transcript } : m));
         }
 
         let botText = aiResponse.speech || "Sure!";
@@ -504,9 +539,7 @@ const AIAssistantOverlay = () => {
             }
             if (foundItem) {
                itemsAddedInThisTurn = true;
-               for (let i = 0; i < quantity; i++) {
-                 addToCart(foundItem);
-               }
+               addToCart(foundItem, quantity);
                setIsCartOpen(true);
                setTimeout(() => {
                  setIsCartOpen(false);
@@ -647,8 +680,14 @@ const AIAssistantOverlay = () => {
       }
     } catch (error) {
       console.warn("AI API failed:", error);
-      // Fallback to error message
-      const fallbackMsg = language === 'Tamil' ? "மன்னிக்கவும், நெட்வொர்க் பிரச்சனை. மீண்டும் முயற்சிக்கவும்." : "Sorry, I'm having trouble connecting. Please try again.";
+      
+      let fallbackMsg;
+      if (error.message && (error.message.includes("AI response") || error.message.includes("No response"))) {
+        fallbackMsg = language === 'Tamil' ? "மன்னிக்கவும், எனக்கு சரியாக புரியவில்லை. மீண்டும் கூற முடியுமா?" : "Sorry, I didn't quite catch that. Could you repeat?";
+      } else {
+        fallbackMsg = language === 'Tamil' ? "மன்னிக்கவும், நெட்வொர்க் பிரச்சனை. மீண்டும் முயற்சிக்கவும்." : "Sorry, I'm having trouble connecting. Please try again.";
+      }
+      
       setTimeout(() => {
         setMessages(prev => [...prev, { role: 'model', content: fallbackMsg }]);
         speakText(fallbackMsg);

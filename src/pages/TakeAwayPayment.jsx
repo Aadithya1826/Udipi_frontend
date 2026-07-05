@@ -43,8 +43,14 @@ const TakeAwayPayment = () => {
         setSelectedMethod(method);
       }
     };
-    const handleConfirmOrder = () => {
-      const currentMethod = document.querySelector('.payment-card.selected h3')?.innerText || 'Cash';
+    const handleConfirmOrder = (e) => {
+      let currentMethod = 'Cash';
+      if (e && e.detail && e.detail.method) {
+        currentMethod = e.detail.method;
+      } else {
+        const pmElement = document.querySelector('.payment-method-card.selected .pm-name');
+        currentMethod = pmElement && pmElement.innerText.includes('Online') ? 'UPI' : 'Cash';
+      }
       handleConfirm(currentMethod);
     };
 

@@ -44,11 +44,14 @@ const Payment = () => {
         setSelectedMethod(method);
       }
     };
-    const handleConfirmOrder = () => {
-      // Need to capture the latest state of selectedMethod, but inside useEffect it might be stale if we don't add selectedMethod to dependencies.
-      // However, we can use the form of handleConfirm that doesn't need an argument and it will use state.
-      // Let's just dispatch handleConfirm()
-      const currentMethod = document.querySelector('.payment-card.selected h3')?.innerText || 'Cash';
+    const handleConfirmOrder = (e) => {
+      let currentMethod = 'Cash';
+      if (e && e.detail && e.detail.method) {
+        currentMethod = e.detail.method;
+      } else {
+        const pmElement = document.querySelector('.payment-method-card.selected .pm-name');
+        currentMethod = pmElement && pmElement.innerText.includes('Online') ? 'UPI' : 'Cash';
+      }
       handleConfirm(currentMethod);
     };
     

@@ -64,7 +64,7 @@ const VoiceAgentBar = () => {
       }
     }
     fetchMenu();
-  }, []);
+  }, [location.pathname]);
 
   // Setup Continuous Recognition
   useEffect(() => {
