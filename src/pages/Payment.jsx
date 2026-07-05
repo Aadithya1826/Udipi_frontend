@@ -42,8 +42,6 @@ const Payment = () => {
       if (e.detail && e.detail.method) {
         const method = e.detail.method === 'Cash' ? 'Cash' : 'UPI';
         setSelectedMethod(method);
-        // Auto trigger confirm when AI selects
-        setTimeout(() => handleConfirm(method), 100);
       }
     };
     const handleConfirmOrder = () => {
@@ -166,7 +164,7 @@ const Payment = () => {
       }
 
       // 3. Create Razorpay order on backend
-      const rzpOrderRes = await fetch(`/api/payments/create-order`, {
+      const rzpOrderRes = await fetch(`/api/v1/payments/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: total })
@@ -179,7 +177,7 @@ const Payment = () => {
 
       // 4. Open Razorpay Checkout modal
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_live_T4wysiHzIDwFA1',
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: rzpOrder.success ? rzpOrder.order.amount : total * 100,
         currency: rzpOrder.success ? rzpOrder.order.currency : 'INR',
         name: 'Data Udipi',

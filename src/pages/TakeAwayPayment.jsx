@@ -41,8 +41,6 @@ const TakeAwayPayment = () => {
       if (e.detail && e.detail.method) {
         const method = e.detail.method === 'Cash' ? 'Cash' : 'UPI';
         setSelectedMethod(method);
-        // Auto trigger confirm when AI selects
-        setTimeout(() => handleConfirm(method), 100);
       }
     };
     const handleConfirmOrder = () => {
@@ -234,7 +232,6 @@ const TakeAwayPayment = () => {
               className={`payment-method-card ${selectedMethod === 'Cash' ? 'selected' : ''}`}
               onClick={() => {
                 setSelectedMethod('Cash');
-                handleConfirm('Cash');
               }}
             >
               <div className="pm-icon-wrap">
@@ -249,7 +246,6 @@ const TakeAwayPayment = () => {
               className={`payment-method-card ${selectedMethod === 'UPI' ? 'selected' : ''}`}
               onClick={() => {
                 setSelectedMethod('UPI');
-                handleConfirm('UPI');
               }}
             >
               <div className="pm-icon-wrap">

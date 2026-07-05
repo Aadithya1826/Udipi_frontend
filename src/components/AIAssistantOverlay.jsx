@@ -217,6 +217,7 @@ const AIAssistantOverlay = () => {
          setIsSpeaking(false);
       }
 
+      window.speechSynthesis.resume();
       window.speechSynthesis.speak(utterance);
     }
   };
@@ -692,7 +693,7 @@ const AIAssistantOverlay = () => {
           title="Talk to Voice Agent"
         >
           <div className="ai-trigger-avatar-wrap">
-            <img src="/agentwaiter logo.png" alt="Agent" style={{ pointerEvents: 'none', userSelect: 'none' }} />
+            <img src="/agentwaiter_logo.png" alt="Agent" style={{ pointerEvents: 'none', userSelect: 'none' }} />
           </div>
           <div className="ai-trigger-text-wrap">
             <span className="ai-trigger-title">
@@ -776,7 +777,7 @@ const AIAssistantOverlay = () => {
                   }}>
                     {msg.role === 'user'
                       ? <i className="fa-solid fa-user-check" style={{ color: 'white', fontSize: '14px' }}></i>
-                      : <img src="/agentwaiter logo.png" alt="Waiter" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <img src="/agentwaiter_logo.png" alt="Waiter" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     }
                   </div>
 
@@ -824,7 +825,7 @@ const AIAssistantOverlay = () => {
             {isLoading && (
               <div className="ai-msg-container model" style={{ display: 'flex', gap: '12px', animation: 'aiMsgIn 0.3s ease-out' }}>
                 <div className="ai-msg-icon" style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'white', display: 'flex', alignItems: 'center', justify: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-                  <img src="/agentwaiter logo.png" alt="Waiter" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src="/agentwaiter_logo.png" alt="Waiter" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div className="ai-msg-bubble" style={{ background: 'white', padding: '12px 18px', borderRadius: '18px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', border: '1px solid #f0f0f0' }}>
                   <span className="dot-typing"></span>
