@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AIAssistantOverlay from '../components/AIAssistantOverlay';
 import '../styles/invoice.css';
+import restaurantBgImg from '../assets/images/restaurant_bg.png';
+import udupiBannerImg from '../assets/images/udupi-banner.png';
 
 export default function Invoice({ embeddedData }) {
   const location = useLocation();
@@ -78,7 +80,7 @@ export default function Invoice({ embeddedData }) {
         
         {/* Banner */}
         <div className="invoice-banner">
-          <img src="/restaurant_bg.png" alt="Restaurant Background" className="banner-img" onError={(e) => e.target.style.display='none'} />
+          <img src={restaurantBgImg} alt="Restaurant Background" className="banner-img" onError={(e) => e.target.style.display='none'} />
           <p className="banner-text">40 years of excellence</p>
           <div className="banner-indicators">
             <div className="indicator active"></div>
@@ -89,7 +91,7 @@ export default function Invoice({ embeddedData }) {
 
         {/* Header */}
         <div className="invoice-header">
-          <img src="/udupi-banner.png" alt="Data Udipi banner" className="invoice-logo" />
+          <img src={udupiBannerImg} alt="Data Udipi banner" className="invoice-logo" />
           <div className="invoice-address-bar">
             <span className="bold-text">Data Udipi :</span>
             <span className="address-text">MGR Nagar, Nesapakkam, Chennai, Tamil Nadu 600078</span>

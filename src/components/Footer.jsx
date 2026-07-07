@@ -1,13 +1,14 @@
 import React from 'react'
 import { useLanguage } from '../context/LanguageContext'
 import '../styles/components.css'
+import chefMascotImg from '../assets/images/chef_mascot.png'
 
 function Footer() {
   const { t } = useLanguage()
   return (
     <footer className="footer">
       <div className="mascot-container">
-        <img src="/chef_mascot.png" alt="Chef Mascot" className="chef-mascot" />
+        <img src={chefMascotImg} alt="Chef Mascot" className="chef-mascot" />
       </div>
     </footer>
   )

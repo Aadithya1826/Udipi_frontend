@@ -4,6 +4,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { useCart } from '../context/CartContext';
 import { buildAgentPrompt } from '../services/agentPromptBuilder';
 import './AIAssistantOverlay.css';
+import agentwaiterLogoImg from '../assets/images/agentwaiter_logo.png';
+import waiterImg from '../assets/images/waiter.png';
 
 const AIAssistantOverlay = () => {
   const { language, t } = useLanguage();
@@ -12,7 +14,7 @@ const AIAssistantOverlay = () => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [isVoiceMode, setIsVoiceMode] = useState(true);
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
 
   const [menuItems, setMenuItems] = useState([]);
@@ -128,12 +130,12 @@ const AIAssistantOverlay = () => {
         }
       };
       
-      // Auto-start listening immediately
-      try {
-        recognition.current.start();
-      } catch (e) {
-        console.warn("Could not auto-start recognition", e);
-      }
+      // Auto-start listening immediately - Disabled by default
+      // try {
+      //   recognition.current.start();
+      // } catch (e) {
+      //   console.warn("Could not auto-start recognition", e);
+      // }
     }
   }, []);
 
@@ -732,7 +734,7 @@ const AIAssistantOverlay = () => {
           title="Talk to Voice Agent"
         >
           <div className="ai-trigger-avatar-wrap">
-            <img src="/agentwaiter_logo.png" alt="Agent" style={{ pointerEvents: 'none', userSelect: 'none' }} />
+            <img src={agentwaiterLogoImg} alt="Agent" style={{ pointerEvents: 'none', userSelect: 'none' }} />
           </div>
           <div className="ai-trigger-text-wrap">
             <span className="ai-trigger-title">
@@ -769,7 +771,7 @@ const AIAssistantOverlay = () => {
                   <div key={i} className="ai-wave-line" />
                 ))}
               </div>
-              <img src="/waiter.png" alt="Waiter Namaste" className="ai-mascot-namaste-original" />
+              <img src={waiterImg} alt="Waiter Namaste" className="ai-mascot-namaste-original" />
             </div>
           </div>
 
@@ -816,7 +818,7 @@ const AIAssistantOverlay = () => {
                   }}>
                     {msg.role === 'user'
                       ? <i className="fa-solid fa-user-check" style={{ color: 'white', fontSize: '14px' }}></i>
-                      : <img src="/agentwaiter_logo.png" alt="Waiter" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <img src={agentwaiterLogoImg} alt="Waiter" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     }
                   </div>
 
@@ -864,7 +866,7 @@ const AIAssistantOverlay = () => {
             {isLoading && (
               <div className="ai-msg-container model" style={{ display: 'flex', gap: '12px', animation: 'aiMsgIn 0.3s ease-out' }}>
                 <div className="ai-msg-icon" style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'white', display: 'flex', alignItems: 'center', justify: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-                  <img src="/agentwaiter_logo.png" alt="Waiter" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={agentwaiterLogoImg} alt="Waiter" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <div className="ai-msg-bubble" style={{ background: 'white', padding: '12px 18px', borderRadius: '18px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', border: '1px solid #f0f0f0' }}>
                   <span className="dot-typing"></span>

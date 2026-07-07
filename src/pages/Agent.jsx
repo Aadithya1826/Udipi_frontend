@@ -6,6 +6,7 @@ import Header from '../components/Header'
 import Invoice from './Invoice'
 import { fetchCategories, fetchItems, formatMenuData } from '../services/menuService'
 import '../styles/pages.css'
+import agentwaiterLogoImg from '../assets/images/agentwaiter_logo.png'
 
 function Agent() {
   const navigate = useNavigate()
@@ -410,7 +411,7 @@ function Agent() {
               <div key={idx} className={`message ${msg.role === 'model' ? 'bot-message' : 'user-message'}`}>
                 {msg.role === 'model' ? (
                   <>
-                    <div className="message-icon bot-icon"><img src="/agentwaiter logo.png" alt="bot" /></div>
+                    <div className="message-icon bot-icon"><img src={agentwaiterLogoImg} alt="bot" /></div>
 
                     {msg.type === 'review' ? (
                       <div className="review-card" style={{ margin: '0 10px', maxWidth: '420px', width: '100%' }}>
@@ -542,7 +543,7 @@ function Agent() {
 
             {isLoading && (
               <div className="message bot-message listening-message">
-                <div className="message-icon bot-icon"><img src="/agentwaiter logo.png" alt="bot" /></div>
+                <div className="message-icon bot-icon"><img src={agentwaiterLogoImg} alt="bot" /></div>
                 <div className="message-content">
                   <div className="message-bubble">...</div>
                   <div className="listening-indicator">

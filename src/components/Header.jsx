@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useLanguage } from '../context/LanguageContext'
 import '../styles/components.css'
+import dataudipiTitleImg from '../assets/images/Dataudupi-Title.png'
+import udupiBannerImg from '../assets/images/udupi-banner.png'
 
 function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = false, showDateTime = true, hideTableIndicator = false, onTableClick }) {
   const { language, setLanguage, t } = useLanguage()
@@ -59,7 +61,7 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
       {/* Logo Sign */}
       <div className={`logo-sign ${shouldUseTitleImage ? 'title-mode' : ''}`}>
         <img
-          src={shouldUseTitleImage ? "/Dataudupi-Title.png" : "/udupi-banner.png"}
+          src={shouldUseTitleImage ? dataudipiTitleImg : udupiBannerImg}
           alt="Data Udipi Logo"
           className={shouldUseTitleImage ? "title-image-header" : "banner-image"}
         />

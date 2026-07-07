@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AgentButton.css';
+import agentwaiterLogoImg from '../assets/images/agentwaiter_logo.png';
 
 const AgentButton = () => {
   const navigate = useNavigate();
@@ -10,7 +11,7 @@ const AgentButton = () => {
       <div className="agent-bubble-hint">
         Hi! I'm your AI Assistant. How can I help?
       </div>
-      <img src="/agentwaiter logo.png" alt="AI Agent" className="agent-mascot-img" />
+      <img src={agentwaiterLogoImg} alt="AI Agent" className="agent-mascot-img" />
     </div>
   );
 };

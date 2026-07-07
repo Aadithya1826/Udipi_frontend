@@ -6,6 +6,9 @@ import Header from '../components/Header'
 import Footer from '../components/Footer'
 import { Html5Qrcode } from 'html5-qrcode'
 import '../styles/home.css'
+import dataudipiTitleImg from '../assets/images/Dataudupi-Title.png'
+import dineinLogoImg from '../assets/images/dinein-logo.png'
+import takeawayLogoImg from '../assets/images/takeaway-logo.png'
 
 if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && !navigator.mediaDevices.getUserMedia.isPatched) {
   const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
@@ -235,7 +238,7 @@ function Home() {
       <main className="main-content">
         <h2 className="welcome-text">{t('welcome')}</h2>
         <div className="main-title">
-          <img src="/Dataudupi-Title.png" alt="Data Udipi" className="title-image" />
+          <img src={dataudipiTitleImg} alt="Data Udipi" className="title-image" />
         </div>
         <p className="subtitle">{t('excellence')}</p>
 
@@ -243,14 +246,14 @@ function Home() {
           <h3 className="order-text">{t('orderHere')}</h3>
           <div className="action-buttons">
             <button className="action-btn" onClick={handleDineInClick}>
-              <img src="/dinein-logo.png" alt="Dine In Icon" className="btn-icon-img" />
+              <img src={dineinLogoImg} alt="Dine In Icon" className="btn-icon-img" />
               <span>{t('dineIn')}</span>
             </button>
             <button className="action-btn" onClick={() => {
               clearAllCarts()
               navigate('/take-away')
             }}>
-              <img src="/takeaway-logo.png" alt="Take Away Icon" className="btn-icon-img" />
+              <img src={takeawayLogoImg} alt="Take Away Icon" className="btn-icon-img" />
               <span>{t('takeAway')}</span>
             </button>
           </div>

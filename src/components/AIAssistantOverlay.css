@@ -176,7 +176,7 @@
   height: 220px;
   background:
     linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 100%),
-    url('/restaurant_bg.png') center center / cover no-repeat;
+    url('../assets/images/restaurant_bg.png') center center / cover no-repeat;
   padding: 14px 18px;
   display: flex;
   flex-direction: column;

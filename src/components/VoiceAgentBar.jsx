@@ -99,10 +99,10 @@ const VoiceAgentBar = () => {
       }
     };
 
-    // Auto start on mount
-    try {
-      recognition.start();
-    } catch (e) {}
+    // Auto start on mount - Disabled by default
+    // try {
+    //   recognition.start();
+    // } catch (e) {}
 
     return () => {
       recognition.onend = null;
