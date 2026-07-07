@@ -7,7 +7,8 @@
     padding: 0 1rem;
     margin-top: 0.5rem;
     position: relative;
-    z-index: 3000; /* Above cart sidebar (2000) */
+    z-index: 3000;
+    /* Above cart sidebar (2000) */
     gap: 2rem;
 }
 
@@ -295,6 +296,7 @@
     height: auto;
     filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.4));
     margin-bottom: -15px;
+    margin-top: -150px;
     z-index: 5;
 }
 
@@ -336,7 +338,8 @@
         padding: 10px 30px;
     }
 
-    .logo-sign, .logo-sign.title-mode {
+    .logo-sign,
+    .logo-sign.title-mode {
         position: static !important;
         transform: none !important;
         margin: 0 !important;
