@@ -2,11 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useCart } from '../context/CartContext';
-import { buildAgentPrompt } from '../services/agentPromptBuilder';
 import './VoiceAgentBar.css';
 
 const VoiceAgentBar = () => {
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const { 
     cart, 
     addToCart, 
@@ -73,7 +72,8 @@ const VoiceAgentBar = () => {
 
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.lang = language === 'Tamil' ? 'ta-IN' : 'en-IN';
+    const langMap = { 'English': 'en-IN', 'Tamil': 'ta-IN', 'Hindi': 'hi-IN', 'Malayalam': 'ml-IN', 'Telugu': 'te-IN', 'Kannada': 'kn-IN' };
+    recognition.lang = langMap[language] || 'en-IN';
 
     recognition.onstart = () => setIsListening(true);
     
@@ -121,10 +121,18 @@ const VoiceAgentBar = () => {
       const utterance = new SpeechSynthesisUtterance(text);
       const voices = window.speechSynthesis.getVoices();
 
+      const langMap = { 'English': 'en-IN', 'Tamil': 'ta-IN', 'Hindi': 'hi-IN', 'Malayalam': 'ml-IN', 'Telugu': 'te-IN', 'Kannada': 'kn-IN' };
+      const targetLang = langMap[language] || 'en-IN';
+      const targetPrefix = targetLang.split('-')[0];
+
       if (language === 'Tamil') {
         const tamilVoice = voices.find(v => v.lang.startsWith('ta') && v.name.toLowerCase().includes('female')) || voices.find(v => v.lang.startsWith('ta'));
         if (tamilVoice) utterance.voice = tamilVoice;
         utterance.lang = 'ta-IN';
+      } else if (language !== 'English') {
+        const regionalVoice = voices.find(v => v.lang.startsWith(targetPrefix));
+        if (regionalVoice) utterance.voice = regionalVoice;
+        utterance.lang = targetLang;
       } else {
         const indVoice = voices.find(v => (v.lang === 'en-IN' || v.name.includes('India')) && (v.name.includes('Sangeeta') || v.name.includes('Rishi') || v.name.includes('Female')));
         if (indVoice) utterance.voice = indVoice;
@@ -153,7 +161,7 @@ const VoiceAgentBar = () => {
   const resumeListening = () => {
     isProcessingRef.current = false;
     setTimeout(() => {
-      if (recognitionRef.current && !isListening) {
+      if (recognitionRef.current && !isListening && !document.hidden) {
         try {
           recognitionRef.current.start();
         } catch (e) {}
@@ -167,21 +175,33 @@ const VoiceAgentBar = () => {
     }
   }, [chatHistory, isLoading]);
 
+  // Handle Tab Visibility (Pause mic when switched away)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        try { recognitionRef.current?.stop(); } catch(e){}
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.cancel();
+        }
+      } else {
+        if (!isProcessingRef.current && !isLoading && !isListening) {
+          try { recognitionRef.current?.start(); } catch(e){}
+        }
+      }
+    };
+    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isLoading, isListening]);
+
   const handleVoiceCommand = async (text) => {
     if (!text.trim()) return;
     
     isProcessingRef.current = true;
     setIsLoading(true);
     if (recognitionRef.current) recognitionRef.current.stop();
-
-    const systemPrompt = buildAgentPrompt({
-      currentPage: location.pathname,
-      language,
-      cart,
-      menuCategories,
-      menuItems,
-      tableNumber
-    });
 
     const apiHistory = chatHistory.filter(msg => msg.role !== 'model' || msg.text !== 'Listening for your order...').map(msg => ({
       role: msg.role === 'model' ? 'model' : 'user',
@@ -196,11 +216,19 @@ const VoiceAgentBar = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          mode: 'voice_assistant',
+          context: {
+            currentPage: location.pathname,
+            language,
+            cart,
+            menuCategories,
+            menuItems,
+            tableNumber
+          },
           contents: apiHistory,
-          systemInstruction: { parts: [{ text: systemPrompt }] },
           generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 250,
+            maxOutputTokens: 800,
             responseMimeType: "application/json"
           }
         })
@@ -211,9 +239,26 @@ const VoiceAgentBar = () => {
       const data = await response.json();
       if (data.candidates && data.candidates[0]) {
         let rawResponse = data.candidates[0].content.parts[0].text;
-        rawResponse = rawResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const startIndex = rawResponse.indexOf('{');
+        const endIndex = rawResponse.lastIndexOf('}');
+        if (startIndex !== -1 && endIndex !== -1 && endIndex >= startIndex) {
+            rawResponse = rawResponse.substring(startIndex, endIndex + 1);
+        } else {
+            rawResponse = rawResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+        }
         
-        const aiResponse = JSON.parse(rawResponse);
+        let aiResponse;
+        try {
+          rawResponse = rawResponse.replace(/,\s*([\]}])/g, '$1'); // Fix trailing commas
+          aiResponse = JSON.parse(rawResponse);
+        } catch (e) {
+          try {
+             aiResponse = new Function("return " + rawResponse)();
+          } catch (e2) {
+             console.error("Failed to parse JSON response:", e, e2, rawResponse);
+             throw new Error("Invalid JSON");
+          }
+        }
         const botSpeech = aiResponse.speech || "Understood.";
         
         setChatHistory(prev => [...prev, { role: 'model', text: botSpeech }]);
@@ -287,11 +332,38 @@ const VoiceAgentBar = () => {
       setIsCartOpen(false);
       navigate(location.pathname.includes('takeaway') ? '/takeaway-checkout' : '/checkout');
     }
-    else if (actionName === 'DOWNLOAD_INVOICE') {
+    else if (actionName === 'PROCEED_TO_PAYMENT') {
+      const nameInput = document.querySelector('input[name="name"]');
+      const phoneInput = document.querySelector('input[name="phone"]');
+      if (nameInput && phoneInput && (!nameInput.value.trim() || phoneInput.value.length < 10)) {
+         const msg = language === 'Tamil' ? "தயவுசெய்து உங்கள் பெயர் மற்றும் தொலைபேசி எண்ணை கூறவும்." : "Please provide your name and phone number.";
+         setChatHistory(prev => [...prev, { role: 'model', text: msg }]);
+         speakText(msg);
+      } else {
+         document.dispatchEvent(new CustomEvent('continue-to-payment'));
+      }
+    }
+    else if (actionName === 'DOWNLOAD_INVOICE' || actionName === 'DOWNLOAD_BILL' || actionName === 'GENERATE_BILL') {
       document.dispatchEvent(new CustomEvent('download-invoice'));
     }
     else if (actionName === 'PAYMENT_METHOD' && parameters.method) {
       document.dispatchEvent(new CustomEvent('select-payment', { detail: { method: parameters.method } }));
+    }
+    else if (actionName === 'SCROLL_DOWN') {
+      const scrollContainer = document.querySelector('.di-grid') || document.querySelector('.checkout-container') || document.querySelector('.main-content') || window;
+      scrollContainer.scrollBy({ top: window.innerHeight * 0.6, behavior: 'smooth' });
+    } 
+    else if (actionName === 'SCROLL_UP') {
+      const scrollContainer = document.querySelector('.di-grid') || document.querySelector('.checkout-container') || document.querySelector('.main-content') || window;
+      scrollContainer.scrollBy({ top: -window.innerHeight * 0.6, behavior: 'smooth' });
+    }
+    else if (actionName === 'CHANGE_LANGUAGE') {
+      if (parameters.language) {
+        const langMatch = parameters.language.toLowerCase();
+        if (langMatch.includes('tamil')) setLanguage('Tamil');
+        else if (langMatch.includes('english')) setLanguage('English');
+        else setLanguage(parameters.language); // Fallback
+      }
     }
   };
 

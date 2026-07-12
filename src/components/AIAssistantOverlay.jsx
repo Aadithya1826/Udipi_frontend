@@ -7,7 +7,7 @@ import agentwaiterLogoImg from '../assets/images/agentwaiter_logo.png';
 import waiterImg from '../assets/images/waiter.png';
 
 const AIAssistantOverlay = () => {
-  const { language, t } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const { cart, setCart, addToCart, changeQty, updateItemQuantity, removeCartItem, updateNote, tableNumber, clearCart, isCartOpen, setIsCartOpen, setActiveCategory } = useCart();
   const location = useLocation();
   const navigate = useNavigate();
@@ -88,7 +88,9 @@ const AIAssistantOverlay = () => {
       if (recognition.current) {
         recognition.current.continuous = false;
         recognition.current.interimResults = false;
-        recognition.current.lang = language === 'Tamil' ? 'ta-IN' : 'en-IN';
+        
+        const langMap = { 'English': 'en-IN', 'Tamil': 'ta-IN', 'Hindi': 'hi-IN', 'Malayalam': 'ml-IN', 'Telugu': 'te-IN', 'Kannada': 'kn-IN' };
+        recognition.current.lang = langMap[language] || 'en-IN';
       }
 
       return () => {
@@ -100,7 +102,8 @@ const AIAssistantOverlay = () => {
 
     // Always update recognition language if it changes
     if (recognition.current) {
-      recognition.current.lang = language === 'Tamil' ? 'ta-IN' : 'en-IN';
+      const langMap = { 'English': 'en-IN', 'Tamil': 'ta-IN', 'Hindi': 'hi-IN', 'Malayalam': 'ml-IN', 'Telugu': 'te-IN', 'Kannada': 'kn-IN' };
+      recognition.current.lang = langMap[language] || 'en-IN';
     }
 
     return () => {
@@ -146,7 +149,7 @@ const AIAssistantOverlay = () => {
       };
       
       let timeoutId;
-      if (isVoiceMode && !isLoading && !isSpeaking && !window.speechSynthesis.speaking && !isListening) {
+      if (isVoiceMode && !document.hidden && !isLoading && !isSpeaking && !window.speechSynthesis.speaking && !isListening) {
         // Add a small delay to avoid rapid fire restarts on "no-speech" errors
         timeoutId = setTimeout(() => {
           try {
@@ -159,6 +162,29 @@ const AIAssistantOverlay = () => {
       return () => clearTimeout(timeoutId);
     }
   }, [isLoading, isSpeaking, isVoiceMode, isListening]);
+
+  // Handle Tab Visibility (Pause mic when switched away)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (isVoiceMode) {
+          try { recognition.current?.stop(); } catch(e){}
+        }
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.cancel();
+        }
+      } else {
+        if (isVoiceMode && !isSpeaking && !isLoading) {
+          try { recognition.current?.start(); } catch(e){}
+        }
+      }
+    };
+    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isVoiceMode, isSpeaking, isLoading]);
 
   const toggleListen = () => {
     if (isVoiceMode) {
@@ -178,8 +204,11 @@ const AIAssistantOverlay = () => {
 
       const voices = window.speechSynthesis.getVoices();
 
+      const langMap = { 'English': 'en-IN', 'Tamil': 'ta-IN', 'Hindi': 'hi-IN', 'Malayalam': 'ml-IN', 'Telugu': 'te-IN', 'Kannada': 'kn-IN' };
+      const targetLang = langMap[language] || 'en-IN';
+      const targetPrefix = targetLang.split('-')[0];
+
       if (language === 'Tamil') {
-        // Try to find a female Tamil voice
         const tamilVoice = voices.find(v =>
           (v.lang.startsWith('ta')) &&
           (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('sangeeta') || v.name.toLowerCase().includes('vani') || v.name.toLowerCase().includes('latha'))
@@ -187,8 +216,11 @@ const AIAssistantOverlay = () => {
 
         if (tamilVoice) utterance.voice = tamilVoice;
         utterance.lang = 'ta-IN';
+      } else if (language !== 'English') {
+        const regionalVoice = voices.find(v => v.lang.startsWith(targetPrefix));
+        if (regionalVoice) utterance.voice = regionalVoice;
+        utterance.lang = targetLang;
       } else {
-        // Try to find a premium Indian voice
         const indVoice = voices.find(v =>
           (v.lang === 'en-IN' || v.name.includes('India')) &&
           (v.name.includes('Sangeeta') || v.name.includes('Rishi'))
@@ -315,7 +347,7 @@ const AIAssistantOverlay = () => {
     }
 
     // 2. Checkout Navigation
-    if (normalizedText.match(/(checkout|pay|payment|bill|place order|confirm order)/i) && !normalizedText.match(/(add|remove)/i)) {
+    if (normalizedText.match(/(checkout|pay|payment|bill|place order|confirm order)/i) && !normalizedText.match(/(add|remove|download)/i)) {
       if (cart.length === 0) {
         const msg = language === 'Tamil' ? "உங்கள் கார்ட் காலியாக உள்ளது. தயவுசெய்து முதலில் ஆர்டர் செய்யவும்." : "Your cart is empty. Please add items to your order first.";
         setMessages(prev => [...prev, { role: 'model', content: msg }]);
@@ -349,6 +381,17 @@ const AIAssistantOverlay = () => {
       }
 
       if (location.pathname.includes('checkout')) {
+         const nameInput = document.querySelector('input[name="name"]');
+         const phoneInput = document.querySelector('input[name="phone"]');
+         
+         if (nameInput && phoneInput && (!nameInput.value.trim() || phoneInput.value.length < 10)) {
+            const msg = language === 'Tamil' ? "தயவுசெய்து உங்கள் பெயர் மற்றும் 10 இலக்க தொலைபேசி எண்ணை முதலில் கூறவும்." : "Please tell me your name and 10-digit phone number first.";
+            setMessages(prev => [...prev, { role: 'model', content: msg }]);
+            speakText(msg);
+            setIsLoading(false);
+            return;
+         }
+
          const msg = language === 'Tamil' ? "பணம் செலுத்தும் பக்கத்திற்கு செல்கிறோம்." : "Proceeding to payment.";
          setMessages(prev => [...prev, { role: 'model', content: msg }]);
          speakText(msg);
@@ -463,7 +506,7 @@ const AIAssistantOverlay = () => {
           contents: apiMessages,
           generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 250,
+            maxOutputTokens: 800,
             responseMimeType: "application/json"
           }
         })
@@ -483,21 +526,32 @@ const AIAssistantOverlay = () => {
           throw new Error("AI response was empty or blocked by safety filters.");
         }
         let rawResponse = candidate.content.parts[0].text;
-        rawResponse = rawResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const startIndex = rawResponse.indexOf('{');
+        const endIndex = rawResponse.lastIndexOf('}');
+        if (startIndex !== -1 && endIndex !== -1 && endIndex >= startIndex) {
+            rawResponse = rawResponse.substring(startIndex, endIndex + 1);
+        } else {
+            rawResponse = rawResponse.replace(/```json/gi, '').replace(/```/g, '').trim();
+        }
         
         let aiResponse;
         try {
+          rawResponse = rawResponse.replace(/,\s*([\]}])/g, '$1'); // Fix trailing commas
           aiResponse = JSON.parse(rawResponse);
         } catch (e) {
-          console.error("Failed to parse JSON response:", e);
-          aiResponse = { 
-            speech: language === 'Tamil' ? "மன்னிக்கவும், எனக்கு சரியாக புரியவில்லை. மீண்டும் கூற முடியுமா?" : "Sorry, I missed that. Could you please repeat?", 
-            action: null 
-          };
-        }
-
-        if (aiResponse.corrected_transcript) {
-           setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: aiResponse.corrected_transcript } : m));
+          try {
+             aiResponse = new Function("return " + rawResponse)();
+          } catch (e2) {
+             console.error("Failed to parse JSON response:", e, e2, rawResponse);
+             if (rawResponse && !rawResponse.startsWith('{') && rawResponse.length > 5) {
+                aiResponse = { speech: rawResponse, action: null };
+             } else {
+                aiResponse = { 
+                  speech: language === 'Tamil' ? "மன்னிக்கவும், எனக்கு சரியாக புரியவில்லை. மீண்டும் கூற முடியுமா?" : "Sorry, I missed that. Could you please repeat?", 
+                  action: null 
+                };
+             }
+          }
         }
 
         let botText = aiResponse.speech || "Sure!";
@@ -667,12 +721,7 @@ const AIAssistantOverlay = () => {
                navigate(location.pathname.includes('takeaway') || location.pathname.includes('take-away') ? '/takeaway-checkout' : '/checkout');
             }
           } else if (action === 'DOWNLOAD_INVOICE' || action === 'DOWNLOAD_BILL') {
-            const billPath = params.billPath || actionObj.billPath;
-            if (billPath) {
-              window.open(billPath, '_blank');
-            } else {
-              document.dispatchEvent(new CustomEvent('download-invoice'));
-            }
+            document.dispatchEvent(new CustomEvent('download-invoice'));
           } else if (action === 'GENERATE_BILL') {
             setTimeout(() => {
               document.dispatchEvent(new CustomEvent('download-invoice'));
@@ -690,9 +739,11 @@ const AIAssistantOverlay = () => {
               document.dispatchEvent(new CustomEvent('update-phone', { detail: { phone: phoneToUpdate } }));
             }
           } else if (action === 'SCROLL_DOWN') {
-            window.scrollBy({ top: window.innerHeight * 0.6, behavior: 'smooth' });
+            const scrollContainer = document.querySelector('.di-grid') || document.querySelector('.checkout-container') || document.querySelector('.main-content') || window;
+            scrollContainer.scrollBy({ top: window.innerHeight * 0.6, behavior: 'smooth' });
           } else if (action === 'SCROLL_UP') {
-            window.scrollBy({ top: -window.innerHeight * 0.6, behavior: 'smooth' });
+            const scrollContainer = document.querySelector('.di-grid') || document.querySelector('.checkout-container') || document.querySelector('.main-content') || window;
+            scrollContainer.scrollBy({ top: -window.innerHeight * 0.6, behavior: 'smooth' });
           } else if (action === 'NEW_ORDER') {
             clearCart();
             setIsOpen(false);
@@ -700,6 +751,23 @@ const AIAssistantOverlay = () => {
           } else if (action === 'GO_HOME') {
             setIsOpen(false);
             navigate('/');
+          } else if (action === 'PROCEED_TO_PAYMENT') {
+            const nameInput = document.querySelector('input[name="name"]');
+            const phoneInput = document.querySelector('input[name="phone"]');
+            if (nameInput && phoneInput && (!nameInput.value.trim() || phoneInput.value.length < 10)) {
+               const msg = language === 'Tamil' ? "தயவுசெய்து உங்கள் பெயர் மற்றும் தொலைபேசி எண்ணை கூறவும்." : "Please provide your name and phone number.";
+               setMessages(prev => [...prev, { role: 'model', content: msg }]);
+               speakText(msg);
+            } else {
+               document.dispatchEvent(new CustomEvent('continue-to-payment'));
+            }
+          } else if (action === 'CHANGE_LANGUAGE') {
+            if (params.language) {
+              const langMatch = params.language.toLowerCase();
+              if (langMatch.includes('tamil')) setLanguage('Tamil');
+              else if (langMatch.includes('english')) setLanguage('English');
+              else setLanguage(params.language); // Fallback
+            }
           }
         };
 
