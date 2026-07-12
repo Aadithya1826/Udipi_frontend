@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useCart } from '../context/CartContext';
-import { buildAgentPrompt } from '../services/agentPromptBuilder';
 import './AIAssistantOverlay.css';
 import agentwaiterLogoImg from '../assets/images/agentwaiter_logo.png';
 import waiterImg from '../assets/images/waiter.png';
@@ -198,7 +197,16 @@ const AIAssistantOverlay = () => {
         utterance.lang = 'en-IN';
       }
 
-      utterance.rate = 1.0;
+      const textLower = text.toLowerCase();
+      if (textLower.includes('welcome') || textLower.includes('hello') || textLower.includes('hi') || textLower.includes('vanakkam')) {
+        utterance.rate = 0.95; // Greetings
+      } else if (textLower.includes('bill') || textLower.includes('total') || textLower.includes('rs') || textLower.includes('₹') || textLower.includes('rupee')) {
+        utterance.rate = 0.95; // Bill amount
+      } else if (textLower.includes('important') || textLower.includes('sorry') || textLower.includes('apologize') || textLower.includes('unfortunately')) {
+        utterance.rate = 0.9; // Important/Apology
+      } else {
+        utterance.rate = 1.0; // Normal conversation
+      }
       utterance.pitch = 1.1;
 
       // Manually set isSpeaking
@@ -431,14 +439,13 @@ const AIAssistantOverlay = () => {
       effectivePage = '/live-order-status';
     }
 
-    const systemPrompt = buildAgentPrompt({
+    const mode = effectivePage === '/' ? 'home_assistant' : 'voice_assistant';
+    const context = {
       currentPage: effectivePage,
       language,
       cart,
-      menuCategories: menuCategories || [],
-      menuItems: menuItems || [],
       tableNumber
-    });
+    };
 
     try {
       const apiMessages = messages.map(m => ({
@@ -451,10 +458,9 @@ const AIAssistantOverlay = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          mode,
+          context,
           contents: apiMessages,
-          systemInstruction: {
-            parts: [{ text: systemPrompt }]
-          },
           generationConfig: {
             temperature: 0.1,
             maxOutputTokens: 250,
@@ -495,6 +501,34 @@ const AIAssistantOverlay = () => {
         }
 
         let botText = aiResponse.speech || "Sure!";
+
+        if (effectivePage === '/' && aiResponse.intent) {
+          const action = aiResponse.action;
+          if (action === 'CLICK_DINE_IN') {
+            botText = language === 'Tamil' 
+                ? "டயன்-இன் அனுபவத்திற்கு உங்களை வரவேற்கிறோம். தொடர உங்கள் டேபிள் QR குறியீட்டை ஸ்கேன் செய்யவும்." 
+                : "Welcome to the Dine-In experience. Please scan the QR code on your table, or enter your table number manually to continue.";
+            document.dispatchEvent(new CustomEvent('open-qr-scanner'));
+          } else if (action === 'CLICK_TAKEAWAY') {
+            botText = language === 'Tamil' 
+                ? "வரவேற்கிறோம்! உங்கள் டேக்-அவே ஆர்டரை தயார் செய்வோம்." 
+                : "Welcome! Let's prepare your takeaway order.";
+            clearCart();
+            navigate('/take-away');
+          } else if (action === 'OPEN_MENU') {
+            botText = language === 'Tamil' ? "மெனுவை திறக்கிறேன்." : "Opening the menu.";
+            navigate('/dine-in');
+          } else if (action === 'SHOW_HELP') {
+            botText = language === 'Tamil' ? "நான் உங்களுக்கு எப்படி உதவ முடியும்?" : "How can I help you today?";
+          } else {
+            botText = language === 'Tamil' ? "டயன்-இன், டேக்-அவே அல்லது டெலிவரி, எது வேண்டும்?" : "Would you like Dine-In, Takeaway, or Delivery?";
+          }
+          
+          setMessages(prev => [...prev, { role: 'model', content: botText, raw: rawResponse }]);
+          speakText(botText);
+          setIsLoading(false);
+          return;
+        }
 
         let itemsAddedInThisTurn = false;
 
@@ -632,8 +666,17 @@ const AIAssistantOverlay = () => {
             } else {
                navigate(location.pathname.includes('takeaway') || location.pathname.includes('take-away') ? '/takeaway-checkout' : '/checkout');
             }
-          } else if (action === 'DOWNLOAD_INVOICE') {
-            document.dispatchEvent(new CustomEvent('download-invoice'));
+          } else if (action === 'DOWNLOAD_INVOICE' || action === 'DOWNLOAD_BILL') {
+            const billPath = params.billPath || actionObj.billPath;
+            if (billPath) {
+              window.open(billPath, '_blank');
+            } else {
+              document.dispatchEvent(new CustomEvent('download-invoice'));
+            }
+          } else if (action === 'GENERATE_BILL') {
+            setTimeout(() => {
+              document.dispatchEvent(new CustomEvent('download-invoice'));
+            }, 2000);
           } else if (action === 'PAYMENT_METHOD' && params.method) {
             document.dispatchEvent(new CustomEvent('select-payment', { detail: { method: params.method } }));
           } else if (action === 'UPDATE_NAME') {

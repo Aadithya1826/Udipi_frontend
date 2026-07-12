@@ -46,6 +46,16 @@ function Home() {
     setManualTable('')
   }
 
+  useEffect(() => {
+    const handleOpenScanner = () => {
+      handleDineInClick();
+    };
+    document.addEventListener('open-qr-scanner', handleOpenScanner);
+    return () => {
+      document.removeEventListener('open-qr-scanner', handleOpenScanner);
+    };
+  }, []);
+
   const stopAllCameraTracks = () => {
     if (window.activeCameraStreams) {
       window.activeCameraStreams.forEach(stream => {

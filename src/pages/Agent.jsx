@@ -270,9 +270,8 @@ function Agent() {
       }
 
       const payload = {
-        systemInstruction: {
-          parts: [{ text: `You are a friendly and polite AI assistant for Data Udipi, a well-known authentic Indian vegetarian restaurant. Your role is to help customers explore the menu and place their orders smoothly. Always respond in ${language}. Keep responses warm, courteous, and concise (1–2 sentences). You may suggest popular items such as Dosas, Idlis, Vadas, Meals, and Filter Coffee when relevant. If a customer asks to view the menu or available options, kindly inform them that you are showing the menu and include the token [SHOW_MENU] in your response.` }]
-        },
+        mode: 'full_page',
+        context: { language },
         contents: apiMessages
       }
 
