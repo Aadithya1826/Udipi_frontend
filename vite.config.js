@@ -8,11 +8,11 @@ export default defineConfig({
     open: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8001',
+        target: 'http://dev-api.dataudipi.com',
         changeOrigin: true
       },
       '/static': {
-        target: 'http://127.0.0.1:8001',
+        target: 'http://dev-api.dataudipi.com',
         changeOrigin: true
       }
     }
