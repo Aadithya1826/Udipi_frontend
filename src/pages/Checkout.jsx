@@ -27,14 +27,9 @@ const Checkout = ({ isTakeaway }) => {
     phone: ''
   });
   
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-
-  const displayToast = (msg) => {
-    setToastMessage(msg);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
-  };
+  const [nameError, setNameError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 
   // Redirect back if cart is empty
   useEffect(() => {
@@ -45,7 +40,47 @@ const Checkout = ({ isTakeaway }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    
+    if (name === 'phone') {
+      const onlyNums = value.replace(/[^0-9]/g, '');
+      setFormData(prev => ({ ...prev, [name]: onlyNums }));
+      
+      if (hasAttemptedSubmit) {
+        if (!/^[6-9]\d{9}$/.test(onlyNums)) {
+          setPhoneError(language === 'Tamil' ? 'தயவுசெய்து சரியான தொலைபேசி எண்ணை உள்ளிடவும்.' : 'Please enter a valid phone number.');
+        } else {
+          setPhoneError('');
+        }
+      }
+      return;
+    }
+
     setFormData(prev => ({ ...prev, [name]: value }));
+    
+    if (hasAttemptedSubmit && name === 'name') {
+      if (!value.trim()) {
+        setNameError(language === 'Tamil' ? 'தயவுசெய்து உங்கள் பெயரை உள்ளிடவும்.' : 'Please enter your full name.');
+      } else {
+        setNameError('');
+      }
+    }
+  };
+
+  const handleBlur = (e) => {
+    if (e.target.name === 'phone') {
+      if (formData.phone && !/^[6-9]\d{9}$/.test(formData.phone)) {
+        setPhoneError(language === 'Tamil' ? 'தயவுசெய்து சரியான தொலைபேசி எண்ணை உள்ளிடவும்.' : 'Please enter a valid phone number.');
+      } else {
+        setPhoneError('');
+      }
+    }
+    if (e.target.name === 'name') {
+      if (!formData.name.trim()) {
+        setNameError(language === 'Tamil' ? 'தயவுசெய்து உங்கள் பெயரை உள்ளிடவும்.' : 'Please enter your full name.');
+      } else {
+        setNameError('');
+      }
+    }
   };
 
   useEffect(() => {
@@ -56,16 +91,36 @@ const Checkout = ({ isTakeaway }) => {
     };
     const handleUpdatePhone = (e) => {
       if (e.detail && e.detail.phone) {
-        setFormData(prev => ({ ...prev, phone: e.detail.phone }));
+        const cleanedPhone = String(e.detail.phone).replace(/\D/g, '');
+        if (/^[6-9]\d{9}$/.test(cleanedPhone)) {
+          setFormData(prev => ({ ...prev, phone: cleanedPhone }));
+        }
       }
     };
 
     const handleContinueToPayment = (e) => {
       setFormData(currentFormData => {
-        if (!currentFormData.name.trim() || currentFormData.phone.length < 10) {
-          displayToast(language === 'Tamil' ? 'தயவுசெய்து உங்கள் பெயர் மற்றும் 10 இலக்க தொலைபேசி எண்ணை உள்ளிடவும்.' : 'Please enter your full name and a valid 10-digit phone number.');
+        setHasAttemptedSubmit(true);
+        let valid = true;
+        
+        if (!currentFormData.name.trim()) {
+          setNameError(language === 'Tamil' ? 'தயவுசெய்து உங்கள் பெயரை உள்ளிடவும்.' : 'Please enter your full name.');
+          valid = false;
+        } else {
+          setNameError('');
+        }
+        
+        if (!/^[6-9]\d{9}$/.test(currentFormData.phone)) {
+          setPhoneError(language === 'Tamil' ? 'தயவுசெய்து சரியான தொலைபேசி எண்ணை உள்ளிடவும்.' : 'Please enter a valid phone number.');
+          valid = false;
+        } else {
+          setPhoneError('');
+        }
+        
+        if (!valid) {
           return currentFormData;
         }
+        
         const paymentRoute = isTakeaway ? '/takeaway-payment' : '/payment';
         navigate(paymentRoute, {
           state: {
@@ -91,8 +146,24 @@ const Checkout = ({ isTakeaway }) => {
 
   const handleContinue = (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    if (!formData.name.trim() || formData.phone.length < 10) {
-      displayToast(language === 'Tamil' ? 'தயவுசெய்து உங்கள் பெயர் மற்றும் 10 இலக்க தொலைபேசி எண்ணை உள்ளிடவும்.' : 'Please enter your full name and a valid 10-digit phone number.');
+    setHasAttemptedSubmit(true);
+    let valid = true;
+    
+    if (!formData.name.trim()) {
+      setNameError(language === 'Tamil' ? 'தயவுசெய்து உங்கள் பெயரை உள்ளிடவும்.' : 'Please enter your full name.');
+      valid = false;
+    } else {
+      setNameError('');
+    }
+
+    if (!/^[6-9]\d{9}$/.test(formData.phone)) {
+      setPhoneError(language === 'Tamil' ? 'தயவுசெய்து சரியான தொலைபேசி எண்ணை உள்ளிடவும்.' : 'Please enter a valid phone number.');
+      valid = false;
+    } else {
+      setPhoneError('');
+    }
+
+    if (!valid) {
       return;
     }
     const paymentRoute = isTakeaway ? '/takeaway-payment' : '/payment';
@@ -125,28 +196,38 @@ const Checkout = ({ isTakeaway }) => {
             <h3 className="checkout-section-title">Customer details</h3>
 
             <div className="checkout-form">
-              <div className="form-group">
+              <div className={`form-group ${nameError ? 'has-error' : ''}`}>
                 <label>Full Name*</label>
-                <input 
-                  type="text" 
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                />
+                <div className="input-wrapper">
+                  <input 
+                    type="text" 
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    required
+                  />
+                  {nameError && <i className="fa-solid fa-circle-exclamation error-icon"></i>}
+                </div>
+                {nameError && <span className="error-message">{nameError}</span>}
               </div>
 
-              <div className="form-group">
+              <div className={`form-group ${phoneError ? 'has-error' : ''}`}>
                 <label>Phone Number*</label>
-                <input 
-                  type="tel" 
-                  name="phone"
-                  placeholder="10 digit number" 
-                  value={formData.phone}
-                  onChange={handleChange}
-                  maxLength="10"
-                  required
-                />
+                <div className="input-wrapper">
+                  <input 
+                    type="tel" 
+                    name="phone"
+                    placeholder="10 digit number" 
+                    value={formData.phone}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    maxLength="10"
+                    required
+                  />
+                  {phoneError && <i className="fa-solid fa-circle-exclamation error-icon"></i>}
+                </div>
+                {phoneError && <span className="error-message">{phoneError}</span>}
               </div>
 
               <div className="form-group">
@@ -287,10 +368,6 @@ const Checkout = ({ isTakeaway }) => {
       )}
 
 
-      {/* Floating Toast Notification */}
-      <div className={`os-toast-notif ${showToast ? 'show' : ''}`}>
-        {toastMessage}
-      </div>
     </div>
   );
 };

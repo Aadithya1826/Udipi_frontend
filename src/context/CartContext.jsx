@@ -56,36 +56,39 @@ export const CartProvider = ({ children }) => {
   };
 
   const addToCart = (item, initialQuantity = 1) => {
+    const q = isNaN(Number(initialQuantity)) ? 1 : Number(initialQuantity);
     setCart((prev) => {
       const existing = prev.find((c) => c.id === item.id);
       if (existing) {
         return prev.map((c) =>
-          c.id === item.id ? { ...c, quantity: c.quantity + initialQuantity } : c
+          c.id === item.id ? { ...c, quantity: (Number(c.quantity) || 0) + q } : c
         );
       }
-      return [...prev, { ...item, quantity: initialQuantity, note: '' }];
+      return [...prev, { ...item, quantity: q, note: '' }];
     });
   };
 
   const changeQty = (id, delta) => {
+    const d = isNaN(Number(delta)) ? 0 : Number(delta);
     setCart((prev) =>
       prev
         .map((c) =>
-          c.id === id ? { ...c, quantity: Math.max(0, c.quantity + delta) } : c
+          c.id === id ? { ...c, quantity: Math.max(0, (Number(c.quantity) || 0) + d) } : c
         )
         .filter((c) => c.quantity > 0)
     );
   };
 
   const updateItemQuantity = (id, quantity) => {
-    if (quantity < 0) return;
+    const q = isNaN(Number(quantity)) ? -1 : Number(quantity);
+    if (q < 0) return;
     setCart((prev) => {
-      if (quantity === 0) {
+      if (q === 0) {
         return prev.filter((c) => c.id !== id);
       }
       const existing = prev.find((c) => c.id === id);
       if (existing) {
-        return prev.map((c) => (c.id === id ? { ...c, quantity } : c));
+        return prev.map((c) => (c.id === id ? { ...c, quantity: q } : c));
       }
       return prev;
     });
@@ -110,7 +113,7 @@ export const CartProvider = ({ children }) => {
   };
 
   const totalItems = cart.length;
-  const subtotal = cart.reduce((s, c) => s + c.price * c.quantity, 0);
+  const subtotal = cart.reduce((s, c) => s + (Number(c.price) || 0) * (Number(c.quantity) || 0), 0);
   const serviceCharge = 0;
   const gst = 0;
   const totalAmount = subtotal;

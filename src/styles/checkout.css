@@ -122,6 +122,36 @@
   min-height: 120px;
 }
 
+/* Error States */
+.form-group.has-error input {
+  border-color: #ff3b30;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-wrapper input {
+  width: 100%;
+}
+
+.error-icon {
+  position: absolute;
+  right: 16px;
+  color: #ff3b30;
+  font-size: 1.2rem;
+}
+
+.error-message {
+  color: #ff3b30;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-top: -5px;
+  margin-left: 8px;
+}
+
 /* Right Column (Order Summary) */
 .checkout-right {
   flex: 1;

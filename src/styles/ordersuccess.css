@@ -633,16 +633,16 @@
 /* Toast */
 .os-toast-notif {
   position: fixed;
-  bottom: 24px;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%) translateY(40px);
-  background: #0f172a;
+  transform: translate(-50%, -50%) scale(0.9);
+  background: #ff3b30;
   color: #fff;
-  padding: 12px 24px;
-  border-radius: 50px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.25);
-  font-size: 13px;
-  font-weight: 600;
+  padding: 20px 24px;
+  border-radius: 12px;
+  box-shadow: 0 12px 36px rgba(255, 59, 48, 0.5);
+  font-size: 15px;
+  font-weight: 700;
   z-index: 9999;
   opacity: 0;
   pointer-events: none;
@@ -651,6 +651,6 @@
 
 .os-toast-notif.show {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  transform: translate(-50%, -50%) scale(1);
 }
 

@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
 import { useCart } from '../context/CartContext'
 import Header from '../components/Header'
-import { fetchCategories, fetchItems, formatMenuData } from '../services/menuService'
+// Menu data is fetched directly below
 import '../styles/pages.css'
 import '../styles/dinein.css'
 

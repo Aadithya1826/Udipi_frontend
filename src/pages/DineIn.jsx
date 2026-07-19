@@ -4,7 +4,7 @@ import { Html5Qrcode } from 'html5-qrcode'
 import { useLanguage } from '../context/LanguageContext'
 import { useCart } from '../context/CartContext'
 import Header from '../components/Header'
-import { fetchCategories, fetchItems, formatMenuData } from '../services/menuService'
+// Menu data is fetched directly below
 import '../styles/pages.css'
 import '../styles/dinein.css'
 import '../styles/home.css'
@@ -42,6 +42,7 @@ function MenuCard({ item, qty, onAdd, onInc, onDec, onUpdateQty }) {
 
       <div className="fg-card-content">
         <h3 className="fg-card-title">
+          {item.itemCode && <span className="item-code-badge">[{item.itemCode}] </span>}
           {language === 'Tamil' && item.tamilName ? item.tamilName : item.name}
         </h3>
         <p className="fg-card-desc">{language === 'Tamil' && item.tamilDesc ? item.tamilDesc : item.description}</p>
@@ -387,6 +388,7 @@ export default function DineIn() {
           const catId = String(catIdMap[rawCatId] || rawCatId);
           const formattedItem = {
             id: Number(item.id),
+            itemCode: item.item_code || String(item.id),
             name: item.name,
             tamilName: item.name, // Fallback to english if tamil not available
             price: Number(item.price),
@@ -438,7 +440,9 @@ export default function DineIn() {
   if (searchQuery.trim()) {
     processedItems = processedItems.filter(i => {
       const name = language === 'Tamil' && i.tamilName ? i.tamilName : i.name;
-      return name.toLowerCase().includes(searchQuery.toLowerCase());
+      const code = i.itemCode ? i.itemCode.toLowerCase() : '';
+      const query = searchQuery.toLowerCase();
+      return name.toLowerCase().includes(query) || code.includes(query);
     })
   }
   if (filterOption === 'available') {
@@ -461,7 +465,33 @@ export default function DineIn() {
         <div className="di-seg-top">
           <div className="di-topbar">
             <div className="di-search-wrap">
-              <input className="di-search-input" placeholder={t('searchPlaceholder')} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              <input 
+                className="di-search-input" 
+                placeholder={t('searchPlaceholder')} 
+                value={searchQuery} 
+                onChange={e => setSearchQuery(e.target.value)} 
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const query = searchQuery.trim().toLowerCase();
+                    if (!query) return;
+                    
+                    let itemToAdd = processedItems.find(i => i.itemCode && i.itemCode.toLowerCase() === query);
+                    if (!itemToAdd && processedItems.length === 1) {
+                      itemToAdd = processedItems[0];
+                    }
+                    
+                    if (itemToAdd && itemToAdd.available) {
+                      const qty = getQty(itemToAdd.id);
+                      if (qty === 0) {
+                        addToCart(itemToAdd);
+                      } else {
+                        changeQty(itemToAdd.id, 1);
+                      }
+                      setSearchQuery('');
+                    }
+                  }
+                }}
+              />
               <i className="fa-solid fa-magnifying-glass di-search-icon" />
             </div>
             <div className="di-topbar-right" ref={filterDropdownRef} style={{ position: 'relative' }}>

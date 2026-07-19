@@ -40,7 +40,8 @@
 }
 
 .ai-trigger-text-wrap {
-  display: none; /* Hidden on desktop */
+  display: none;
+  /* Hidden on desktop */
 }
 
 .ai-hover-tooltip {
@@ -145,11 +146,11 @@
 /* Floating Card Overlay */
 .ai-sidebar-overlay {
   position: fixed;
-  top: 72px;
+  top: 90px;
   right: -450px;
   width: 340px;
-  height: calc(100vh - 88px);
-  max-height: 720px;
+  height: calc(100vh - 120px);
+  max-height: 640px;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(25px);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
@@ -175,7 +176,7 @@
   position: relative;
   height: 220px;
   background:
-    linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.25) 100%),
     url('../assets/images/restaurant_bg.png') center center / cover no-repeat;
   padding: 14px 18px;
   display: flex;
@@ -201,8 +202,8 @@
   right: 0;
   top: 50%;
   transform: translateY(-50%);
-  background: rgba(255,255,255,0.15);
-  border: 1px solid rgba(255,255,255,0.3);
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   color: white;
   font-size: 18px;
   cursor: pointer;
@@ -216,7 +217,7 @@
 }
 
 .ai-close-x:hover {
-  background: rgba(255,255,255,0.3);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .ai-namaste-wrap-original {
@@ -261,25 +262,91 @@
   animation: aiWave 0.8s infinite alternate ease-in-out;
 }
 
-.ai-wave-line:nth-child(1) { animation-delay: 0.0s; height: 10px; }
-.ai-wave-line:nth-child(2) { animation-delay: 0.1s; height: 22px; }
-.ai-wave-line:nth-child(3) { animation-delay: 0.2s; height: 14px; }
-.ai-wave-line:nth-child(4) { animation-delay: 0.15s; height: 30px; }
-.ai-wave-line:nth-child(5) { animation-delay: 0.05s; height: 18px; }
-.ai-wave-line:nth-child(6) { animation-delay: 0.25s; height: 26px; }
-.ai-wave-line:nth-child(7) { animation-delay: 0.1s; height: 12px; }
-.ai-wave-line:nth-child(8) { animation-delay: 0.3s; height: 22px; }
-.ai-wave-line:nth-child(9) { animation-delay: 0.08s; height: 16px; }
-.ai-wave-line:nth-child(10) { animation-delay: 0.18s; height: 28px; }
-.ai-wave-line:nth-child(11) { animation-delay: 0.12s; height: 14px; }
-.ai-wave-line:nth-child(12) { animation-delay: 0.22s; height: 20px; }
-.ai-wave-line:nth-child(13) { animation-delay: 0.07s; height: 24px; }
-.ai-wave-line:nth-child(14) { animation-delay: 0.16s; height: 10px; }
-.ai-wave-line:nth-child(15) { animation-delay: 0.28s; height: 18px; }
+.ai-wave-line:nth-child(1) {
+  animation-delay: 0.0s;
+  height: 10px;
+}
+
+.ai-wave-line:nth-child(2) {
+  animation-delay: 0.1s;
+  height: 22px;
+}
+
+.ai-wave-line:nth-child(3) {
+  animation-delay: 0.2s;
+  height: 14px;
+}
+
+.ai-wave-line:nth-child(4) {
+  animation-delay: 0.15s;
+  height: 30px;
+}
+
+.ai-wave-line:nth-child(5) {
+  animation-delay: 0.05s;
+  height: 18px;
+}
+
+.ai-wave-line:nth-child(6) {
+  animation-delay: 0.25s;
+  height: 26px;
+}
+
+.ai-wave-line:nth-child(7) {
+  animation-delay: 0.1s;
+  height: 12px;
+}
+
+.ai-wave-line:nth-child(8) {
+  animation-delay: 0.3s;
+  height: 22px;
+}
+
+.ai-wave-line:nth-child(9) {
+  animation-delay: 0.08s;
+  height: 16px;
+}
+
+.ai-wave-line:nth-child(10) {
+  animation-delay: 0.18s;
+  height: 28px;
+}
+
+.ai-wave-line:nth-child(11) {
+  animation-delay: 0.12s;
+  height: 14px;
+}
+
+.ai-wave-line:nth-child(12) {
+  animation-delay: 0.22s;
+  height: 20px;
+}
+
+.ai-wave-line:nth-child(13) {
+  animation-delay: 0.07s;
+  height: 24px;
+}
+
+.ai-wave-line:nth-child(14) {
+  animation-delay: 0.16s;
+  height: 10px;
+}
+
+.ai-wave-line:nth-child(15) {
+  animation-delay: 0.28s;
+  height: 18px;
+}
 
 @keyframes aiWave {
-  from { transform: scaleY(0.4); opacity: 0.6; }
-  to   { transform: scaleY(1.4); opacity: 1; }
+  from {
+    transform: scaleY(0.4);
+    opacity: 0.6;
+  }
+
+  to {
+    transform: scaleY(1.4);
+    opacity: 1;
+  }
 }
 
 /* Greeting Section */
@@ -522,7 +589,8 @@
 .ai-cart-card {
   border: 2px dashed #eee;
   border-radius: 20px;
-  padding: 20px 12px 12px 12px; /* Slightly reduced padding */
+  padding: 20px 12px 12px 12px;
+  /* Slightly reduced padding */
   margin-bottom: 12px;
   display: flex;
   flex-wrap: wrap;
@@ -536,7 +604,7 @@
   right: 8px;
   width: 24px;
   height: 24px;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0, 0, 0, 0.6);
   color: white;
   border: none;
   border-radius: 50%;
@@ -555,7 +623,8 @@
 }
 
 .ai-card-thumb {
-  width: 50px; /* Reduced from 60px */
+  width: 50px;
+  /* Reduced from 60px */
   height: 50px;
   border-radius: 50%;
   overflow: hidden;
@@ -575,7 +644,8 @@
 }
 
 .ai-card-name {
-  font-size: 13px; /* Reduced from 14px */
+  font-size: 13px;
+  /* Reduced from 14px */
   font-weight: 800;
   color: #1a1a1a;
   margin: 0;
@@ -588,7 +658,8 @@
 }
 
 .ai-card-price {
-  font-size: 13px; /* Reduced from 14px */
+  font-size: 13px;
+  /* Reduced from 14px */
   color: #ff4e00;
   font-weight: 800;
   margin: 0;
@@ -608,7 +679,8 @@
 }
 
 .ai-card-total-val {
-  font-size: 16px; /* Reduced from 18px */
+  font-size: 16px;
+  /* Reduced from 18px */
   color: #ff4e00;
   font-weight: 800;
   margin: 0;
@@ -696,85 +768,79 @@
 @media (max-width: 768px) {
   .ai-trigger-btn {
     position: fixed !important;
-    bottom: 12px !important;
-    left: 50% !important;
-    transform: translateX(-50%) !important;
+    bottom: 24px !important;
+    right: 16px !important;
+    left: auto !important;
     top: auto !important;
-    right: auto !important;
-    width: 220px !important;
-    height: 48px !important;
-    border-radius: 30px !important;
+    transform: none !important;
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 50% !important;
     background: #ffffff !important;
     border: 1px solid rgba(0, 0, 0, 0.15) !important;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08) !important;
-    padding: 4px 16px !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15) !important;
+    padding: 6px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 10px !important;
   }
+
   .ai-trigger-btn:hover {
-    transform: translateX(-50%) scale(1.05) !important;
+    transform: scale(1.05) !important;
   }
+
   .ai-trigger-avatar-wrap {
-    width: 32px !important;
-    height: 32px !important;
+    width: 100% !important;
+    height: 100% !important;
   }
+
   .ai-trigger-text-wrap {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    font-family: 'Poppins', 'Outfit', sans-serif !important;
-    line-height: 1.25 !important;
+    display: none !important;
   }
-  .ai-trigger-title {
-    font-size: 13px !important;
-    font-weight: 700 !important;
-    color: #1a1a1a !important;
-  }
-  .ai-trigger-subtitle {
-    font-size: 9px !important;
-    color: #666 !important;
-    font-weight: 500 !important;
-  }
+
   .ai-hover-tooltip {
     display: none !important;
   }
 
-  /* Mini Chatbot UI for Mobile */
+  /* Side Bar UI for Mobile */
   .ai-sidebar-overlay {
-    top: auto !important;
-    bottom: 80px !important; /* Just above the pill trigger */
-    right: 16px !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    right: -100vw !important;
     left: auto !important;
-    width: calc(100vw - 32px) !important;
-    max-width: 320px !important;
-    height: 55vh !important;
-    max-height: 450px !important;
-    border-radius: 28px !important;
-    box-shadow: 0 15px 50px rgba(0,0,0,0.3) !important;
+    width: 85vw !important;
+    max-width: 360px !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    border-top-left-radius: 24px !important;
+    border-bottom-left-radius: 24px !important;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.2) !important;
+    transition: right 0.4s cubic-bezier(0.19, 1, 0.22, 1) !important;
+    transform: none !important;
   }
-  
+
   .ai-sidebar-overlay.active {
-    transform: translateY(0) !important;
+    right: 0 !important;
+    transform: none !important;
   }
-  
+
   .ai-sidebar-overlay:not(.active) {
-    transform: translateY(150%) !important;
-    right: 16px !important;
+    right: -100vw !important;
+    transform: none !important;
   }
 
   .ai-hero-frosted-original {
-    height: 120px !important;
-    padding: 8px !important;
+    height: 160px !important;
+    padding: 14px !important;
   }
-  
+
   .ai-mascot-namaste-original {
-    height: 80px !important;
-    margin-top: -10px !important;
+    height: 100px !important;
+    margin-top: -5px !important;
   }
-  
+
   .ai-unified-header {
-    font-size: 13px !important;
+    font-size: 15px !important;
   }
 }
