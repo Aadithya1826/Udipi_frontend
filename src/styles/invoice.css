@@ -1,7 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
 .invoice-page {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
   background-color: #f3f4f6;
   display: flex;
   align-items: flex-start;
@@ -374,10 +376,23 @@
 }
 
 .social-qr {
-  width: 166px;
+  width: 180px;
   height: auto;
   object-fit: contain;
   margin: 0 auto;
+}
+
+.insta-handle {
+  font-family: 'Poppins', monospace, sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 1px;
+  background: -webkit-linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-top: 10px;
+  margin-bottom: 25px;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .download-btn-container {
@@ -391,19 +406,22 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background-color: #00A01D;
+  background-color: #00a82d;
   color: white;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 15px;
-  padding: 0.4rem 1rem;
+  padding: 0.6rem 1.25rem;
   border-radius: 0.5rem;
   border: none;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0, 168, 45, 0.2);
 }
 
 .download-btn:hover {
-  background-color: #008a18;
+  background-color: #008f26;
+  box-shadow: 0 6px 16px rgba(0, 168, 45, 0.3);
+  transform: translateY(-1px);
 }
 
 /* Mobile Responsive Styles */

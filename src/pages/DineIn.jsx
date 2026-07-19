@@ -62,7 +62,7 @@ function MenuCard({ item, qty, onAdd, onInc, onDec, onUpdateQty }) {
             <span>−</span>
           </button>
           <div className="fg-qty-display">
-            <input 
+            <input
               type="text"
               inputMode="numeric"
               value={qty === 0 ? '' : qty}
@@ -135,7 +135,7 @@ export default function DineIn() {
   const [topHeight] = useState(100)
   const [cardScale] = useState(1.0)
 
-  const [menuCategories, setMenuCategories] = useState([{ id: 'all', name: 'All Menu', image: '/all menu.png' }])
+  const [menuCategories, setMenuCategories] = useState([{ id: 'all', name: 'All Menu', image: null }])
   const [menuItems, setMenuItems] = useState({ all: [] })
   const [loading, setLoading] = useState(true)
 
@@ -268,11 +268,11 @@ export default function DineIn() {
     if (showScanner) {
       const timer = setTimeout(() => {
         if (!active) return
-        
+
         try {
           html5QrCode = new Html5Qrcode("qr-reader")
           qrCodeInstanceRef.current = html5QrCode
-          
+
           html5QrCode.start(
             { facingMode: "environment" },
             {
@@ -284,7 +284,7 @@ export default function DineIn() {
                 handleScanSuccess(decodedText)
               }
             },
-            () => {}
+            () => { }
           ).then(() => {
             if (!active && html5QrCode) {
               stopAllCameraTracks()
@@ -346,20 +346,20 @@ export default function DineIn() {
     requestAnimationFrame(() => {
       setIsCartOpen(false)
     })
-    
+
     // Fetch menu data from backend
     async function fetchMenuData() {
       try {
         const catRes = await fetch('/api/v1/public/menu/categories');
         const dbCategories = await catRes.json();
-        
+
         const itemRes = await fetch('/api/v1/public/menu/items');
         const dbItems = await itemRes.json();
 
         const catIdMap = {};
         const uniqueCategories = [];
         const seenNames = new Map();
-        
+
         for (const cat of dbCategories) {
           const normName = cat.name.trim().toLowerCase();
           if (!seenNames.has(normName)) {
@@ -372,17 +372,17 @@ export default function DineIn() {
         }
 
         const formattedCategories = [
-          { id: 'all', name: 'All Menu', image: '/all menu.png' },
+          { id: 'all', name: 'All Menu', image: null },
           ...uniqueCategories.map(c => ({
             id: String(c.id),
             name: c.name,
-            image: '/cat_dosa.png' // Default placeholder image
+            image: c.image_url || null
           }))
         ];
 
         const formattedItems = {};
         const allItems = [];
-        
+
         dbItems.forEach(item => {
           const rawCatId = item.category_id;
           const catId = String(catIdMap[rawCatId] || rawCatId);
@@ -434,7 +434,7 @@ export default function DineIn() {
   }, [activeCategory])
 
   const baseItems = menuItems[activeCategory] ?? menuItems.all
-  
+
   // Apply search, filters and sorting
   let processedItems = [...baseItems]
   if (searchQuery.trim()) {
@@ -465,21 +465,21 @@ export default function DineIn() {
         <div className="di-seg-top">
           <div className="di-topbar">
             <div className="di-search-wrap">
-              <input 
-                className="di-search-input" 
-                placeholder={t('searchPlaceholder')} 
-                value={searchQuery} 
-                onChange={e => setSearchQuery(e.target.value)} 
+              <input
+                className="di-search-input"
+                placeholder={t('searchPlaceholder')}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
                 onKeyDown={e => {
                   if (e.key === 'Enter') {
                     const query = searchQuery.trim().toLowerCase();
                     if (!query) return;
-                    
+
                     let itemToAdd = processedItems.find(i => i.itemCode && i.itemCode.toLowerCase() === query);
                     if (!itemToAdd && processedItems.length === 1) {
                       itemToAdd = processedItems[0];
                     }
-                    
+
                     if (itemToAdd && itemToAdd.available) {
                       const qty = getQty(itemToAdd.id);
                       if (qty === 0) {
@@ -495,8 +495,8 @@ export default function DineIn() {
               <i className="fa-solid fa-magnifying-glass di-search-icon" />
             </div>
             <div className="di-topbar-right" ref={filterDropdownRef} style={{ position: 'relative' }}>
-              <button 
-                className={`di-filter-btn ${showFilterDropdown ? 'active' : ''} ${(filterOption !== 'all' || sortOption !== 'default') ? 'applied' : ''}`} 
+              <button
+                className={`di-filter-btn ${showFilterDropdown ? 'active' : ''} ${(filterOption !== 'all' || sortOption !== 'default') ? 'applied' : ''}`}
                 onClick={() => setShowFilterDropdown(!showFilterDropdown)}
               >
                 <i className="fa-solid fa-sliders" />
@@ -541,7 +541,7 @@ export default function DineIn() {
           <div className="di-tabs-wrap">
             {menuCategories.map(cat => (
               <button key={cat.id} className={`di-tab ${activeCategory === cat.id ? 'active' : ''}`} onClick={() => setActiveCategory(cat.id)}>
-                <img src={cat.image} alt={t(cat.name)} className="di-tab-img" onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                {cat.image && <img src={cat.image} alt={t(cat.name)} className="di-tab-img" onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }} />}
                 <span>{language === 'Tamil' && cat.tamilName ? cat.tamilName : t(cat.name)}</span>
               </button>
             ))}
@@ -565,8 +565,8 @@ export default function DineIn() {
           </div>
           {isMobile && processedItems.length > 6 && (
             <div className="di-show-more-wrap" style={{ display: 'flex', justifyContent: 'center', marginTop: '15px' }}>
-              <button 
-                className="di-show-more-btn" 
+              <button
+                className="di-show-more-btn"
                 onClick={() => setShowAllItems(!showAllItems)}
                 style={{
                   background: '#ff3400',
@@ -611,7 +611,7 @@ export default function DineIn() {
           <div className="di-cart-header">
             <div className="di-cart-header-left">
               <span className="di-cart-title">{t('cart') || 'Cart'}</span>
-              <span className="di-cart-table-pill" onClick={() => setShowScanner(true)} style={{cursor: 'pointer'}}>{t('tableNo')} {tableNumber} <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
+              <span className="di-cart-table-pill" onClick={() => setShowScanner(true)} style={{ cursor: 'pointer' }}>{t('tableNo')} {tableNumber} <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
             </div>
             <button className="di-cart-close" onClick={() => setIsCartOpen(false)}>✕</button>
           </div>
@@ -641,7 +641,7 @@ export default function DineIn() {
                       <p className="di-cart-total-amount">{(item.price * item.quantity).toFixed(2)}</p>
                       <div className="di-cart-stepper">
                         <button className="di-cart-qty-btn minus" onClick={() => changeQty(item.id, -1)}>−</button>
-                        <input 
+                        <input
                           className="di-cart-qty-num"
                           type="text"
                           inputMode="numeric"
@@ -725,10 +725,10 @@ export default function DineIn() {
               <h5 className="manual-card-title">Unable to scan?</h5>
               <p className="manual-card-subtitle">Enter the table number manually from your table card</p>
               <div className="manual-input-group">
-                <input 
-                  type="text" 
-                  className="manual-table-input" 
-                  placeholder="Table No. (e.g. 05)" 
+                <input
+                  type="text"
+                  className="manual-table-input"
+                  placeholder="Table No. (e.g. 05)"
                   value={manualTable}
                   onChange={(e) => setManualTable(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}

@@ -20,6 +20,18 @@ const AIAssistantOverlay = () => {
   const [menuCategories, setMenuCategories] = useState([]);
 
   useEffect(() => {
+    if (isCartOpen && isOpen) {
+      setIsOpen(false);
+    }
+  }, [isCartOpen]);
+
+  useEffect(() => {
+    if (isOpen && isCartOpen) {
+      setIsCartOpen(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     async function fetchMenu() {
       try {
         const catRes = await fetch('/api/v1/public/menu/categories');
@@ -936,6 +948,7 @@ const AIAssistantOverlay = () => {
 
           <div className="ai-chat-messages" style={{
             flex: 1,
+            minHeight: 0,
             overflowY: 'auto',
             scrollBehavior: 'smooth',
             WebkitOverflowScrolling: 'touch',
@@ -1007,7 +1020,7 @@ const AIAssistantOverlay = () => {
                               textAlign: 'center',
                               border: '1px solid #eee'
                             }}>
-                              <img src={cat.image} alt={cat.name} style={{ width: '40px', height: '40px', borderRadius: '50%', marginBottom: '5px', objectFit: 'cover' }} />
+                              {cat.image && <img src={cat.image} alt={cat.name} style={{ width: '40px', height: '40px', borderRadius: '50%', marginBottom: '5px', objectFit: 'cover' }} />}
                               <div style={{ fontSize: '12px', fontWeight: '600' }}>{cat.name}</div>
                             </div>
                           ))}

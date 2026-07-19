@@ -31,11 +31,11 @@ export async function placeOrder(orderData) {
  */
 export function formatMenuData(dbCategories, dbItems) {
   const categories = [
-    { id: 'all', name: 'All Menu', image: '/all menu.png' },
+    { id: 'all', name: 'All Menu', image: null },
     ...dbCategories.map(c => ({
       id: String(c.id),
       name: c.name,
-      image: '/cat_dosa.png',
+      image: c.image_url || null,
     })),
   ];
 

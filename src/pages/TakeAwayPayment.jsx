@@ -28,6 +28,12 @@ const TakeAwayPayment = () => {
   const { formData = {}, autoConfirmMethod } = location.state || {};
 
   useEffect(() => {
+    if (cart.length === 0) {
+      navigate('/take-away', { replace: true });
+    }
+  }, [cart, navigate]);
+
+  useEffect(() => {
     setIsCartOpen(false);
     
     if (autoConfirmMethod) {

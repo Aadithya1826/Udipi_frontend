@@ -121,7 +121,7 @@ export default function TakeAway() {
   const [topHeight] = useState(100)
   const [cardScale] = useState(1.0)
 
-  const [menuCategories, setMenuCategories] = useState([{ id: 'all', name: 'All Menu', image: '/all menu.png' }])
+  const [menuCategories, setMenuCategories] = useState([{ id: 'all', name: 'All Menu', image: null }])
   const [menuItems, setMenuItems] = useState({ all: [] })
   const [loading, setLoading] = useState(true)
 
@@ -173,11 +173,11 @@ export default function TakeAway() {
         }
 
         const formattedCategories = [
-          { id: 'all', name: 'All Menu', image: '/all menu.png' },
+          { id: 'all', name: 'All Menu', image: null },
           ...uniqueCategories.map(c => ({
             id: String(c.id),
             name: c.name,
-            image: '/cat_dosa.png' // Default placeholder image
+            image: c.image_url || null
           }))
         ];
 
@@ -342,7 +342,7 @@ export default function TakeAway() {
           <div className="di-tabs-wrap">
             {menuCategories.map(cat => (
               <button key={cat.id} className={`di-tab ${activeCategory === cat.id ? 'active' : ''}`} onClick={() => setActiveCategory(cat.id)}>
-                <img src={cat.image} alt={t(cat.name)} className="di-tab-img" onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }} />
+                {cat.image && <img src={cat.image} alt={t(cat.name)} className="di-tab-img" onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }} />}
                 <span>{language === 'Tamil' && cat.tamilName ? cat.tamilName : t(cat.name)}</span>
               </button>
             ))}

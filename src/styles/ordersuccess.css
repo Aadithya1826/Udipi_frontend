@@ -2,10 +2,12 @@
 
 .os-page {
   position: relative;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   padding-top: 40px;
+  overflow: hidden;
 }
 
 .os-bg {
@@ -22,9 +24,9 @@
   z-index: 1;
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px 24px 36px;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 24px 24px 40px;
 }
 
 .os-card {
@@ -32,6 +34,7 @@
   border-radius: 24px;
   width: 100%;
   max-width: 620px;
+  margin: auto; /* Magically centers in flex both vertically and horizontally, preventing clipping on overflow */
   padding: 34px 40px 36px;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
   animation: osSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -249,7 +252,6 @@
 }
 
 @media (max-width: 768px) {
-  .os-main { align-items: flex-start !important; }
   .os-card { padding: 24px 16px 22px; }
   .os-meta { grid-template-columns: 1fr; gap: 10px; }
   .os-actions { flex-direction: column; gap: 12px; }

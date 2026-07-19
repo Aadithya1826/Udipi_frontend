@@ -11,7 +11,6 @@ import PaymentFailed from './pages/PaymentFailed'
 
 import TakeAwayPayment from './pages/TakeAwayPayment'
 import TakeAwayOrderSuccess from './pages/TakeAwayOrderSuccess'
-import TakeAwayInvoice from './pages/TakeAwayInvoice'
 import Checkout from './pages/Checkout'
 import { CartProvider } from './context/CartContext'
 import AIAssistantOverlay from './components/AIAssistantOverlay'
@@ -35,7 +34,6 @@ function App() {
         <Route path="/takeaway-checkout" element={<Checkout isTakeaway={true} />} />
         <Route path="/takeaway-payment" element={<TakeAwayPayment />} />
         <Route path="/takeaway-order-success" element={<TakeAwayOrderSuccess />} />
-        <Route path="/takeaway-invoice" element={<TakeAwayInvoice />} />
       </Routes>
       <AIAssistantOverlay />
       </CartProvider>

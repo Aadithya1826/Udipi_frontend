@@ -213,7 +213,7 @@ const TakeAwayOrderSuccess = () => {
                 <i className="fa-solid fa-house" /> {translate('Back to Home', 'முகப்பு')}
               </button>
               <button className="os-download-btn" onClick={() => {
-                navigate('/takeaway-invoice', {
+                navigate('/invoice', {
                   state: {
                     orderId,
                     cartData,

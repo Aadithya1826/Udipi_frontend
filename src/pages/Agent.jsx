@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
 import { useCart } from '../context/CartContext'
 import Header from '../components/Header'
-import Invoice from './Invoice'
 import { fetchCategories, fetchItems, formatMenuData } from '../services/menuService'
 import '../styles/pages.css'
 import agentwaiterLogoImg from '../assets/images/agentwaiter_logo.png'
@@ -30,7 +29,7 @@ function Agent() {
 
   const menuTopRef = useRef(null)
   const [micToast, setMicToast] = useState('')
-  const [menuCategories, setMenuCategories] = useState([{ id: 'all', name: 'All Menu', image: '/all menu.png' }]);
+  const [menuCategories, setMenuCategories] = useState([{ id: 'all', name: 'All Menu', image: null }]);
   const [menuItems, setMenuItems] = useState({ all: [] });
   const [allItems, setAllItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -522,7 +521,7 @@ function Agent() {
                           <div className="corner bl"></div>
                           <div className="corner br"></div>
 
-                          <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=DummyPayment123" alt="QR Code" />
+                          <img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=dataudipi@upi%26pn=DataUdipi%26am=${msg.finalTotal ? msg.finalTotal.toFixed(2) : '0.00'}%26cu=INR`} alt="Payment QR Code" />
                         </div>
 
                         <p className="scan-text" style={{ marginTop: '15px', color: '#ff3b00', fontWeight: 600 }}>{t('scanToPay')}</p>
@@ -563,7 +562,7 @@ function Agent() {
                           onClick={() => handleCategoryClick(cat)}
                         >
                           <div className="menu-img">
-                            <img src={cat.image} alt={cat.name} />
+                            {cat.image && <img src={cat.image} alt={cat.name} />}
                           </div>
                           <div className="menu-name">{t(cat.name)}</div>
                         </div>
@@ -578,7 +577,7 @@ function Agent() {
                             className={`cat-pill ${activeCategory === cat.id ? 'active' : ''}`}
                             onClick={() => handleCategoryClick(cat)}
                           >
-                            <img src={cat.image} alt={cat.name} className="cat-pill-img" />
+                            {cat.image && <img src={cat.image} alt={cat.name} className="cat-pill-img" />}
                             <span>{cat.name}</span>
                           </div>
                         ))}

@@ -29,6 +29,12 @@ const Payment = () => {
   const { formData = {}, autoConfirmMethod } = location.state || {};
 
   useEffect(() => {
+    if (cart.length === 0) {
+      navigate('/dine-in', { replace: true });
+    }
+  }, [cart, navigate]);
+
+  useEffect(() => {
     setIsCartOpen(false);
     
     if (autoConfirmMethod) {

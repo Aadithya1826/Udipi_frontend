@@ -48,9 +48,9 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
     <header className={`header ${showFullHeader ? 'full-header' : ''}`}>
       {/* Table Indicator */}
       {!hideTableIndicator && (
-        <div 
-          className="table-indicator" 
-          onClick={onTableClick} 
+        <div
+          className="table-indicator"
+          onClick={onTableClick}
           style={onTableClick ? { cursor: 'pointer' } : {}}
         >
           <span className="table-text">{t('tableNo')}</span>

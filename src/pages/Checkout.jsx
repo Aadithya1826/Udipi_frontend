@@ -11,12 +11,9 @@ const Checkout = ({ isTakeaway }) => {
   const {
     cart,
     subtotal,
-    serviceCharge,
-    gst,
     totalAmount: total,
     tableNumber,
     changeQty,
-    removeCartItem,
     updateItemQuantity,
     isCartOpen,
     setIsCartOpen
@@ -124,7 +121,7 @@ const Checkout = ({ isTakeaway }) => {
         const paymentRoute = isTakeaway ? '/takeaway-payment' : '/payment';
         navigate(paymentRoute, {
           state: {
-            ...location.state,
+            ...(location.state || {}),
             formData: currentFormData,
             autoConfirmMethod: e?.detail?.autoConfirm ? e.detail.method : undefined
           }
@@ -169,7 +166,7 @@ const Checkout = ({ isTakeaway }) => {
     const paymentRoute = isTakeaway ? '/takeaway-payment' : '/payment';
     navigate(paymentRoute, {
       state: {
-        ...location.state,
+        ...(location.state || {}),
         formData: formData
       }
     });
