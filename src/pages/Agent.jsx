@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
 import { useCart } from '../context/CartContext'
 import Header from '../components/Header'
-import { fetchCategories, fetchItems, formatMenuData } from '../services/menuService'
+import { fetchCategories, fetchItems, formatMenuData, placeOrder } from '../services/menuService'
 import '../styles/pages.css'
 import agentwaiterLogoImg from '../assets/images/agentwaiter_logo.png'
 
@@ -175,16 +175,54 @@ function Agent() {
     if (isAwaitingPayment) {
       if (lowerText === 'done' || lowerText.includes('done')) {
         setIsAwaitingPayment(false);
-        
-        navigate('/invoice', { 
-          state: { 
-            cartData: finalInvoiceData?.cartData || [],
+        setIsLoading(true);
+
+        try {
+          const orderData = {
+            table_number: "06",
+            payment_method: 'UPI',
+            phone: mobileNumber,
+            cart: finalInvoiceData?.cartData.map(item => ({
+              id: item.id,
+              quantity: item.quantity,
+              price: item.price,
+              note: item.note || ''
+            })) || [],
             subtotal: finalInvoiceData?.subtotal || 0,
             gst: finalInvoiceData?.gst || 0,
-            finalTotal: finalInvoiceData?.finalTotal || 0,
-            mobileNumber: mobileNumber
-          } 
-        });
+            service_charge: finalInvoiceData?.service || 0,
+            total_amount: finalInvoiceData?.finalTotal || 0
+          };
+
+          const result = await placeOrder(orderData);
+          const dbId = result.order_id || result.id;
+          const generatedOrderId = dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+          
+          navigate('/invoice', { 
+            state: { 
+              orderId: generatedOrderId,
+              cartData: finalInvoiceData?.cartData || [],
+              subtotal: finalInvoiceData?.subtotal || 0,
+              gst: finalInvoiceData?.gst || 0,
+              finalTotal: finalInvoiceData?.finalTotal || 0,
+              mobileNumber: mobileNumber
+            } 
+          });
+        } catch (err) {
+          console.error("Order placement error:", err);
+          navigate('/invoice', { 
+            state: { 
+              orderId: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
+              cartData: finalInvoiceData?.cartData || [],
+              subtotal: finalInvoiceData?.subtotal || 0,
+              gst: finalInvoiceData?.gst || 0,
+              finalTotal: finalInvoiceData?.finalTotal || 0,
+              mobileNumber: mobileNumber
+            } 
+          });
+        } finally {
+          setIsLoading(false);
+        }
         return;
       }
     }

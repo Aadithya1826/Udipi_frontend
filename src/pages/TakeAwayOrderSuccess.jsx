@@ -63,11 +63,11 @@ const TakeAwayOrderSuccess = () => {
 
     const checkStatus = async () => {
       try {
-        const res = await fetch(`/api/v1/orders/${activeOrderId}/status`);
+        const res = await fetch(`/api/orders/${activeOrderId}`);
         if (!res.ok) return;
         const data = await res.json();
         if (isMounted) {
-          setDbStatus(data.status); // PENDING, CONFIRMED, PREPARING, READY, SERVED, CANCELLED
+          setDbStatus(data.order?.status || data.status); // PENDING, CONFIRMED, PREPARING, READY, SERVED, CANCELLED
         }
       } catch (err) {
         console.warn("Could not fetch order status from server, using simulation:", err);

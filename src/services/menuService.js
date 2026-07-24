@@ -13,7 +13,7 @@ export async function fetchItems() {
 }
 
 export async function placeOrder(orderData) {
-  const res = await fetch(`${API_BASE}/api/v1/orders`, {
+  const res = await fetch(`${API_BASE}/api/orders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(orderData),

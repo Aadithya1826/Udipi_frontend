@@ -92,7 +92,7 @@ const TakeAwayPayment = () => {
       };
 
       try {
-        const res = await fetch(`/api/v1/orders`, {
+        const res = await fetch(`/api/orders`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(orderData)
@@ -150,7 +150,7 @@ const TakeAwayPayment = () => {
 
     try {
       // 1. Create order in our DB first
-      const orderRes = await fetch(`/api/v1/orders`, {
+      const orderRes = await fetch(`/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderData)
@@ -172,7 +172,7 @@ const TakeAwayPayment = () => {
       }
 
       // 3. Create Razorpay order on backend
-      const rzpOrderRes = await fetch(`/api/v1/payments/create-order`, {
+      const rzpOrderRes = await fetch(`/api/create-razorpay-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: total })
