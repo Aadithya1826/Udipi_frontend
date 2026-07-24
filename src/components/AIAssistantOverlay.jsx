@@ -68,21 +68,23 @@ const AIAssistantOverlay = () => {
   const messagesEndRef = useRef(null);
 
   // Speech Recognition Setup
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = useRef(SpeechRecognition ? new SpeechRecognition() : null);
+  // MediaRecorder Setup for Audio Processing via Gemini
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const streamRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const animationFrameRef = useRef(null);
+  const isSpeakingRef = useRef(false);
+  const hasSpokenRef = useRef(false);
+  const shouldListenRef = useRef(isVoiceMode);
 
   useEffect(() => {
-    // --- Interruptible Speech ---
-    // Stop speaking if the user clicks or interacts with anything else
     const stopSpeech = () => {
-      if (window.speechSynthesis.speaking) {
-        window.speechSynthesis.cancel();
-      }
+      if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
     };
     window.addEventListener('mousedown', stopSpeech);
     window.addEventListener('touchstart', stopSpeech);
 
-    // --- Greeting Logic (Only on first load/refresh of Dine-In) ---
     const hasGreeted = sessionStorage.getItem('ai_has_greeted');
     const isDineIn = location.pathname === '/' || location.pathname === '/dine-in';
 
@@ -91,120 +93,128 @@ const AIAssistantOverlay = () => {
         const greeting = language === 'Tamil'
           ? "வணக்கம்! டேட்டா உடுப்பிக்கு உங்களை வரவேற்கிறோம். எங்களின் புதிய சைவ உணவுகளைப் பார்த்து மகிழுங்கள். உங்களுக்கு ஏதேனும் உதவி தேவைப்பட்டால் சொல்லுங்கள்."
           : "Vanakkam! Welcome to Data Udipi. Explore our freshly prepared vegetarian dishes. Let me know if you need any help.";
-
         setMessages([{ role: 'model', content: greeting }]);
-        // speakText(greeting); // Removed initial voice reply as requested
         sessionStorage.setItem('ai_has_greeted', 'true');
       }, 1500);
-
-      if (recognition.current) {
-        recognition.current.continuous = false;
-        recognition.current.interimResults = false;
-
-        const langMap = { 'English': 'en-IN', 'Tamil': 'ta-IN', 'Hindi': 'hi-IN', 'Malayalam': 'ml-IN', 'Telugu': 'te-IN', 'Kannada': 'kn-IN' };
-        recognition.current.lang = langMap[language] || 'en-IN';
-      }
-
-      return () => {
-        clearTimeout(timer);
-        window.removeEventListener('mousedown', stopSpeech);
-        window.removeEventListener('touchstart', stopSpeech);
-      };
+      return () => { clearTimeout(timer); window.removeEventListener('mousedown', stopSpeech); window.removeEventListener('touchstart', stopSpeech); };
     }
-
-    // Always update recognition language if it changes
-    if (recognition.current) {
-      const langMap = { 'English': 'en-IN', 'Tamil': 'ta-IN', 'Hindi': 'hi-IN', 'Malayalam': 'ml-IN', 'Telugu': 'te-IN', 'Kannada': 'kn-IN' };
-      recognition.current.lang = langMap[language] || 'en-IN';
-    }
-
-    return () => {
-      window.removeEventListener('mousedown', stopSpeech);
-      window.removeEventListener('touchstart', stopSpeech);
-    };
+    return () => { window.removeEventListener('mousedown', stopSpeech); window.removeEventListener('touchstart', stopSpeech); };
   }, [language, location.pathname]);
 
   const handleSendMessageRef = useRef(null);
 
-  // We will assign this ref below after handleSendMessage is defined.
-
   useEffect(() => {
-    if (recognition.current) {
-      recognition.current.onstart = () => setIsListening(true);
-      recognition.current.onerror = (event) => {
-        console.error("Voice recognition error:", event.error);
-        setIsListening(false);
-      };
-      recognition.current.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInputText(transcript);
-        setIsOpen(true); // Auto open when user speaks
-        if (handleSendMessageRef.current) {
-          handleSendMessageRef.current(transcript);
-        }
-      };
-
-      // Auto-start listening immediately - Disabled by default
-      // try {
-      //   recognition.current.start();
-      // } catch (e) {
-      //   console.warn("Could not auto-start recognition", e);
-      // }
-    }
-  }, []);
-
-  // Handle continuous listening
-  useEffect(() => {
-    if (recognition.current) {
-      recognition.current.onend = () => {
-        setIsListening(false);
-      };
-
-      let timeoutId;
-      if (isVoiceMode && !document.hidden && !isLoading && !isSpeaking && !window.speechSynthesis.speaking && !isListening) {
-        // Add a small delay to avoid rapid fire restarts on "no-speech" errors
-        timeoutId = setTimeout(() => {
-          try {
-            recognition.current.start();
-          } catch (e) {
-            // Ignore if already started
-          }
-        }, 300);
-      }
+    shouldListenRef.current = isVoiceMode && !document.hidden && !isLoading && !isSpeaking && !window.speechSynthesis.speaking;
+    if (shouldListenRef.current && !isListening) {
+      const timeoutId = setTimeout(() => startListening(), 1000);
       return () => clearTimeout(timeoutId);
     }
-  }, [isLoading, isSpeaking, isVoiceMode, isListening]);
+  }, [isVoiceMode, isLoading, isSpeaking, isListening]);
 
-  // Handle Tab Visibility (Pause mic when switched away)
+  const startListening = async () => {
+    if (isListening || !shouldListenRef.current) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        streamRef.current?.getTracks().forEach(track => track.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        if (hasSpokenRef.current) {
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = () => {
+            const base64Audio = reader.result.split(',')[1];
+            if (handleSendMessageRef.current) {
+              handleSendMessageRef.current(null, base64Audio);
+            }
+          };
+        } else {
+          setIsListening(false);
+        }
+      };
+
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      audioContextRef.current = audioContext;
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.minDecibels = -60; // Slightly less sensitive
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      hasSpokenRef.current = false;
+      let silenceStart = Date.now();
+
+      const detectSilence = () => {
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) sum += dataArray[i];
+        const average = sum / bufferLength;
+
+        if (average > 3) {
+          hasSpokenRef.current = true;
+          silenceStart = Date.now();
+        } else {
+          if (hasSpokenRef.current && (Date.now() - silenceStart > 1500)) {
+             stopListening(true);
+             return;
+          }
+          if (!hasSpokenRef.current && (Date.now() - silenceStart > 10000)) {
+             stopListening(false);
+             return;
+          }
+        }
+        animationFrameRef.current = requestAnimationFrame(detectSilence);
+      };
+
+      detectSilence();
+      mediaRecorder.start();
+      setIsListening(true);
+      setIsOpen(true);
+    } catch (err) {
+      console.error("Microphone error:", err);
+      setIsListening(false);
+      setIsVoiceMode(false);
+    }
+  };
+
+  const stopListening = (shouldProcess = false) => {
+    if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+    if (audioContextRef.current) audioContextRef.current.close().catch(() => {});
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      if (!shouldProcess) hasSpokenRef.current = false;
+      mediaRecorderRef.current.stop();
+      setIsListening(false);
+    }
+  };
+
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        if (isVoiceMode) {
-          try { recognition.current?.stop(); } catch (e) { }
-        }
-        if (window.speechSynthesis.speaking) {
-          window.speechSynthesis.cancel();
-        }
-      } else {
-        if (isVoiceMode && !isSpeaking && !isLoading) {
-          try { recognition.current?.start(); } catch (e) { }
-        }
-      }
+      if (document.hidden) stopListening(false);
+      else if (isVoiceMode && !isSpeaking && !isLoading) startListening();
     };
-
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [isVoiceMode, isSpeaking, isLoading]);
 
   const toggleListen = () => {
     if (isVoiceMode) {
       setIsVoiceMode(false);
-      try { recognition.current?.stop(); } catch (e) { }
+      stopListening(false);
     } else {
       setIsVoiceMode(true);
-      try { recognition.current?.start(); } catch (e) { }
+      startListening();
     }
   };
 
@@ -257,11 +267,9 @@ const AIAssistantOverlay = () => {
       setIsSpeaking(true);
 
       // Ensure microphone is explicitly STOPPED before speaking to prevent self-feedback loop
-      if (recognition.current) {
-        try {
-          recognition.current.abort(); // Use abort instead of stop to immediately kill it without firing onresult
-        } catch (e) { }
-      }
+      try {
+        stopListening(false);
+      } catch (e) { }
 
       utterance.onend = () => {
         setIsSpeaking(false);
@@ -276,10 +284,9 @@ const AIAssistantOverlay = () => {
     }
   };
 
-  const handleSendMessage = async (text = inputText) => {
-    if (!text.trim()) return;
-
-    const lowerText = text.toLowerCase();
+  const handleSendMessage = async (text = inputText, audioBase64 = null) => {
+    if (!audioBase64 && !text.trim()) return;
+    const lowerText = text ? text.toLowerCase() : '';
 
     // Phonetic/Misspelling Correction
     const phoneticMap = {
@@ -308,6 +315,7 @@ const AIAssistantOverlay = () => {
     // YES -> Execute immediately
     // NO -> Send to Gemini
 
+    if (!audioBase64) {
     // 1. Cart Navigation
     if (normalizedText.match(/(open|view|show|go to)\s*(cart|basket)/i) || normalizedText.includes('கார்ட்டைக் காட்டு')) {
       setIsCartOpen(true);
@@ -492,6 +500,7 @@ const AIAssistantOverlay = () => {
       return;
     }
 
+    }
     // --- NO LOCAL NAVIGATION MATCH -> SEND TO GEMINI ---
 
     let effectivePage = location.pathname;
@@ -512,7 +521,11 @@ const AIAssistantOverlay = () => {
         role: m.role === 'model' ? 'model' : 'user',
         parts: [{ text: m.raw || m.content }]
       }));
-      apiMessages.push({ role: 'user', parts: [{ text }] });
+      if (audioBase64) {
+        apiMessages.push({ role: 'user', parts: [{ inlineData: { mimeType: 'audio/webm', data: audioBase64 } }] });
+      } else {
+        apiMessages.push({ role: 'user', parts: [{ text }] });
+      }
 
       const response = await fetch(`/api/chat`, {
         method: 'POST',
@@ -572,6 +585,71 @@ const AIAssistantOverlay = () => {
         }
 
         let botText = aiResponse.speech || "Sure!";
+        if (aiResponse.transcript) {
+           const trLower = aiResponse.transcript.toLowerCase();
+           setInputText(aiResponse.transcript);
+           setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: aiResponse.transcript } : m));
+           
+           const navMatch = aiResponse.transcript.match(/(?:open|go to|show|view|navigate to|take me to)\s+(.+)/i);
+           if (navMatch && !trLower.match(/(cart|basket)/i)) {
+             const requestedCat = navMatch[1].trim().toLowerCase().replace(/th/g, 't').replace(/s$/, '');
+             const displayCategories = menuCategories.filter(cat => cat.id !== 'all');
+             const specificCat = displayCategories.find(c => {
+               const cName = c.name.toLowerCase().replace(/th/g, 't').replace(/s$/, '');
+               return requestedCat.includes(cName) || cName.includes(requestedCat) || requestedCat === c.id;
+             });
+             if (specificCat) {
+               setActiveCategory(specificCat.id);
+               setIsOpen(false);
+               if (!location.pathname.includes('dine-in') && !location.pathname.includes('take-away')) navigate('/dine-in');
+               botText = language === 'Tamil' ? `${specificCat.name} menu-vai thirakkiren.` : `Opening ${specificCat.name} menu.`;
+               aiResponse.intent = false; // Prevent Gemini action fallback
+             }
+           }
+
+           if (trLower.match(/(open|view|show|go to)\s*(cart|basket)/i) || trLower.includes('கார்ட்டைக் காட்டு')) {
+             setIsCartOpen(true); botText = language === 'Tamil' ? "நிச்சயமாக, இதோ உங்கள் கார்ட்." : "Sure, here is your cart.";
+           } else if (trLower.match(/(close|hide)\s*(cart|basket)/i) || trLower.includes('கார்ட்டை மறை')) {
+             setIsCartOpen(false); botText = language === 'Tamil' ? "கார்ட் மூடப்பட்டது." : "Okay, I've hidden the cart.";
+           } else if (trLower.match(/scroll\s*down|go\s*down|page\s*down/i)) {
+             window.scrollBy({ top: window.innerHeight * 0.6, behavior: 'smooth' }); botText = "Scrolling down.";
+           } else if (trLower.match(/scroll\s*up|go\s*up|page\s*up/i)) {
+             window.scrollBy({ top: -window.innerHeight * 0.6, behavior: 'smooth' }); botText = "Scrolling up.";
+           } else if (trLower.match(/go\s*home|home\s*page/i)) {
+             setTimeout(() => { setIsOpen(false); navigate('/'); }, 1000); botText = "Going home.";
+           } else if (trLower.match(/new\s*order|start\s*over|cancel\s*order/i)) {
+             clearCart(); setTimeout(() => { setIsOpen(false); navigate('/dine-in'); }, 1000); botText = "Starting new order.";
+           } else if (trLower.match(/(checkout|pay|payment|bill|place order|confirm order)/i) && !trLower.match(/(add|remove|download)/i)) {
+             if (cart.length === 0) {
+               botText = language === 'Tamil' ? "Unga cart empty ah irukku. Thayavu seithu mudhalil order seiyavum." : "Your cart is empty. Please add items to your order first.";
+             } else {
+               setIsCartOpen(false);
+               setIsOpen(false);
+               if (location.pathname.includes('payment')) {
+                 if (trLower.match(/(go to payment|navigate to payment)/i)) {
+                   botText = language === 'Tamil' ? "Neengal yerkkanave payment pakkathil ulleergal." : "You are already on the payment page.";
+                 } else if (trLower.match(/(place order|confirm order|pay|ok|done|cash|upi|online|card|paytm|gpay|phonepe)/i)) {
+                   const isPaymentMethod = trLower.match(/(cash|upi|online|card|paytm|gpay|phonepe)/i);
+                   let method;
+                   if (isPaymentMethod) {
+                     method = trLower.match(/(cash)/i) ? 'Cash' : 'UPI';
+                     document.dispatchEvent(new CustomEvent('select-payment', { detail: { method } }));
+                   }
+                   botText = language === 'Tamil' ? "Order seiyappadugirathu." : "Placing your order.";
+                   setTimeout(() => { document.dispatchEvent(new CustomEvent('confirm-place-order', { detail: { method } })); }, 1000);
+                 }
+               } else if (location.pathname.includes('checkout')) {
+                 botText = language === 'Tamil' ? "Payment pakkathirku selgirom." : "Proceeding to payment.";
+                 setTimeout(() => { document.dispatchEvent(new CustomEvent('continue-to-payment')); }, 1000);
+               } else {
+                 botText = language === 'Tamil' ? "Mudhalil checkout seiyavum." : "Taking you to checkout first.";
+                 setTimeout(() => { navigate(location.pathname.includes('takeaway') || location.pathname.includes('take-away') ? '/takeaway-checkout' : '/checkout'); }, 1000);
+               }
+             }
+             aiResponse.intent = false; // Prevent Gemini action fallback
+           }
+        }
+
 
         if (effectivePage === '/' && aiResponse.intent) {
           const action = aiResponse.action;
@@ -606,6 +684,26 @@ const AIAssistantOverlay = () => {
         const executeAction = (actionObj) => {
           const action = actionObj.type || actionObj.action;
           const params = actionObj.parameters || {};
+
+          let updatedName = false;
+          let updatedPhone = false;
+
+          const nameToUpdate = params.fullName || params.customerName || (action === 'UPDATE_NAME' ? params.name : null);
+          if (nameToUpdate) {
+            document.dispatchEvent(new CustomEvent('update-name', { detail: { name: nameToUpdate } }));
+            updatedName = true;
+          }
+
+          const phoneToUpdate = params.phone || params.number || params.phoneNumber || params.mobile;
+          if (phoneToUpdate) {
+            const cleanedPhone = String(phoneToUpdate).replace(/\D/g, '');
+            if (/^[6-9]\d{9}$/.test(cleanedPhone)) {
+              document.dispatchEvent(new CustomEvent('update-phone', { detail: { phone: cleanedPhone } }));
+              updatedPhone = true;
+            } else if (action === 'UPDATE_PHONE') {
+              return language === 'Tamil' ? "Thayavu seithu sariyana 10-digit phone number-ai kooravum." : "Please provide a valid 10-digit Indian phone number.";
+            }
+          }
 
           if (action === 'ADD_ITEM' && params.name) {
             const itemName = params.name.toLowerCase();
@@ -756,21 +854,8 @@ const AIAssistantOverlay = () => {
             }, 2000);
           } else if (action === 'PAYMENT_METHOD' && params.method) {
             document.dispatchEvent(new CustomEvent('select-payment', { detail: { method: params.method } }));
-          } else if (action === 'UPDATE_NAME') {
-            const nameToUpdate = params.name || params.fullName || params.customerName;
-            if (nameToUpdate) {
-              document.dispatchEvent(new CustomEvent('update-name', { detail: { name: nameToUpdate } }));
-            }
-          } else if (action === 'UPDATE_PHONE') {
-            const phoneToUpdate = params.phone || params.number || params.phoneNumber || params.mobile;
-            if (phoneToUpdate) {
-              const cleanedPhone = String(phoneToUpdate).replace(/\D/g, '');
-              if (/^[6-9]\d{9}$/.test(cleanedPhone)) {
-                document.dispatchEvent(new CustomEvent('update-phone', { detail: { phone: cleanedPhone } }));
-              } else {
-                return language === 'Tamil' ? "Thayavu seithu sariyana 10-digit phone number-ai kooravum." : "Please provide a valid 10-digit Indian phone number.";
-              }
-            }
+          } else if (action === 'UPDATE_NAME' || action === 'UPDATE_PHONE') {
+            // Already handled at the start of executeAction
           } else if (action === 'SCROLL_DOWN') {
             const scrollContainer = document.querySelector('.di-grid') || document.querySelector('.checkout-container') || document.querySelector('.main-content') || window;
             scrollContainer.scrollBy({ top: window.innerHeight * 0.6, behavior: 'smooth' });
@@ -787,7 +872,11 @@ const AIAssistantOverlay = () => {
           } else if (action === 'PROCEED_TO_PAYMENT') {
             const nameInput = document.querySelector('input[name="name"]');
             const phoneInput = document.querySelector('input[name="phone"]');
-            if (nameInput && phoneInput && (!nameInput.value.trim() || !/^[6-9]\d{9}$/.test(phoneInput.value))) {
+            
+            const hasName = updatedName || (nameInput && nameInput.value.trim());
+            const hasPhone = updatedPhone || (phoneInput && /^[6-9]\d{9}$/.test(phoneInput.value.replace(/\D/g, '')));
+
+            if (!hasName || !hasPhone) {
               return language === 'Tamil' ? "Thayavu seithu ungal peyar matrum phone number-ai kooravum." : "Please provide your name and phone number.";
             } else {
               document.dispatchEvent(new CustomEvent('continue-to-payment'));
@@ -859,7 +948,7 @@ const AIAssistantOverlay = () => {
       setIsOpen(false);
       if (isVoiceMode) {
         setIsVoiceMode(false);
-        try { recognition.current?.stop(); } catch (e) { }
+        stopListening(false);
       }
     }
   };
@@ -909,7 +998,7 @@ const AIAssistantOverlay = () => {
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '15px', zIndex: 10 }}>
               <div style={{ display: 'flex', background: 'rgba(0,0,0,0.4)', borderRadius: '25px', padding: '4px' }}>
                 <button
-                  onClick={() => { setIsVoiceMode(false); try { recognition.current?.stop(); } catch(e){} }}
+                  onClick={() => { setIsVoiceMode(false); stopListening(false); }}
                   style={{
                     padding: '6px 16px', borderRadius: '20px', border: 'none',
                     background: !isVoiceMode ? '#fff' : 'transparent',
@@ -920,7 +1009,7 @@ const AIAssistantOverlay = () => {
                   <i className="fa-solid fa-keyboard" style={{marginRight: '6px'}}></i> Typing
                 </button>
                 <button
-                  onClick={() => { setIsVoiceMode(true); try { recognition.current?.start(); } catch(e){} }}
+                  onClick={() => { setIsVoiceMode(true); }}
                   style={{
                     padding: '6px 16px', borderRadius: '20px', border: 'none',
                     background: isVoiceMode ? '#ff4e00' : 'transparent',
