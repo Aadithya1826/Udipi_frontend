@@ -140,14 +140,42 @@ function Agent() {
   const speakText = (text) => {
     if (isMutedRef.current || !window.speechSynthesis) return;
 
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    // Set language for voice synthesis
     utterance.lang = language === 'English' ? 'en-US' : 'ta-IN';
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const charonVoice = voices.find(v => v.name.toLowerCase().includes('charon'));
+
+    if (charonVoice) {
+      utterance.voice = charonVoice;
+      utterance.pitch = 0.95;
+      utterance.rate = 1.0;
+    } else {
+      const requestedVoice = voices.find(v => {
+        const n = v.name.toLowerCase();
+        return n.includes('achird') || n.includes('sulafat') || n.includes('aoede');
+      });
+
+      if (requestedVoice) {
+        utterance.voice = requestedVoice;
+        const vName = requestedVoice.name.toLowerCase();
+        if (vName.includes('sulafat')) {
+          utterance.pitch = 1.0;
+          utterance.rate = 0.95;
+        } else if (vName.includes('aoede')) {
+          utterance.pitch = 1.25;
+          utterance.rate = 1.05;
+        } else {
+          utterance.pitch = 1.1;
+          utterance.rate = 1.0;
+        }
+      } else {
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1;
+      }
+    }
 
     window.speechSynthesis.speak(utterance);
   }
@@ -159,12 +187,27 @@ function Agent() {
 
     // Task 2: Check for menu items in the text
     const normalize = (s) => s.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "").replace(/\s{2,}/g, " ").trim();
-    const normalizedInput = normalize(lowerText);
-    
-    const foundItem = allItems.find(item => {
-      const itemName = normalize(item.name).replace(/\d+$/, '').trim(); // Remove portions like 2 at the end
-      return normalizedInput.includes(itemName) || (item.tamilName && normalize(item.tamilName).includes(normalizedInput));
+    let normalizedInput = normalize(lowerText).replace(/\*{2,}/g, 'mushroom').replace(/\bshroom\b/gi, 'mushroom').replace(/\bmusroom\b/gi, 'mushroom');
+    Object.entries(phoneticMap).forEach(([wrong, right]) => {
+      const safeWrong = wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const isSpecial = /[.*+?^${}()|[\]\\]/.test(wrong);
+      const pattern = isSpecial ? safeWrong : `\\b${safeWrong}\\b`;
+      normalizedInput = normalizedInput.replace(new RegExp(pattern, 'gi'), right);
     });
+
+    const cleanItemName = (str) => (str || '').toLowerCase().replace(/\s*\(\d+.*?\)/g, '').replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, '').trim();
+
+    let foundItem = allItems.find(item => {
+      const cName = cleanItemName(item.name);
+      return normalizedInput.includes(cName) || (item.tamilName && normalizedInput.includes(cleanItemName(item.tamilName)));
+    });
+
+    if (!foundItem && allItems) {
+      foundItem = allItems.find(item => {
+        const cName = cleanItemName(item.name);
+        return cName.includes(normalizedInput) || normalizedInput.includes(cName);
+      });
+    }
 
     if (foundItem) {
       handleAddToCart(foundItem);
@@ -229,7 +272,7 @@ function Agent() {
 
     if (isAwaitingMobile) {
       if (lowerText === 'done' || lowerText.includes('done')) {
-        if (mobileNumber.length === 10 && /^[6-9]\d{9}$/.test(mobileNumber)) {
+        if (mobileNumber.length === 10 && /^\d{10}$/.test(mobileNumber)) {
           setIsAwaitingMobile(false);
           setIsAwaitingPayment(true);
           setMessages([{ role: 'model', type: 'qr_prompt' }]);

@@ -37,12 +37,13 @@ export const CartProvider = ({ children }) => {
   }, [location.search, location.hash]);
 
   const [carts, setCarts] = useState(() => {
-    const saved = localStorage.getItem('udipi_carts_v2');
+    localStorage.removeItem('udipi_carts_v2');
+    const saved = sessionStorage.getItem('udipi_carts_session_v1');
     return saved ? JSON.parse(saved) : { dinein: [], takeaway: [] };
   });
 
   useEffect(() => {
-    localStorage.setItem('udipi_carts_v2', JSON.stringify(carts));
+    sessionStorage.setItem('udipi_carts_session_v1', JSON.stringify(carts));
   }, [carts]);
 
   const cart = carts[cartKey] || [];
@@ -57,55 +58,83 @@ export const CartProvider = ({ children }) => {
 
   const addToCart = (item, initialQuantity = 1) => {
     const q = isNaN(Number(initialQuantity)) ? 1 : Number(initialQuantity);
-    setCart((prev) => {
-      const existing = prev.find((c) => c.id === item.id);
+    const updateHelper = (prevList) => {
+      const existing = prevList.find((c) => c.id === item.id);
       if (existing) {
-        return prev.map((c) =>
+        return prevList.map((c) =>
           c.id === item.id ? { ...c, quantity: (Number(c.quantity) || 0) + q } : c
         );
       }
-      return [...prev, { ...item, quantity: q, note: '' }];
+      return [...prevList, { ...item, quantity: q, note: '' }];
+    };
+
+    setCarts((prev) => {
+      const isOnHome = location.pathname === '/' || location.pathname === '';
+      if (isOnHome || (!prev.dinein?.length && !prev.takeaway?.length)) {
+        return {
+          dinein: updateHelper(prev.dinein || []),
+          takeaway: updateHelper(prev.takeaway || [])
+        };
+      }
+      const currentCart = prev[cartKey] || [];
+      const updatedCart = updateHelper(currentCart);
+      const otherKey = cartKey === 'dinein' ? 'takeaway' : 'dinein';
+      const otherCart = (!prev[otherKey] || prev[otherKey].length === 0) ? updatedCart : prev[otherKey];
+      return { ...prev, [cartKey]: updatedCart, [otherKey]: otherCart };
+    });
+  };
+
+  const syncCartToOtherMode = (targetMode) => {
+    const targetKey = String(targetMode).toLowerCase().includes('takeaway') || String(targetMode).toLowerCase().includes('take-away') ? 'takeaway' : 'dinein';
+    const sourceKey = targetKey === 'takeaway' ? 'dinein' : 'takeaway';
+    setCarts(prev => {
+      const sourceCart = prev[sourceKey] || [];
+      const currentTarget = prev[targetKey] || [];
+      return {
+        ...prev,
+        [targetKey]: sourceCart.length > 0 ? [...sourceCart] : currentTarget
+      };
     });
   };
 
   const changeQty = (id, delta) => {
     const d = isNaN(Number(delta)) ? 0 : Number(delta);
-    setCart((prev) =>
-      prev
-        .map((c) =>
-          c.id === id ? { ...c, quantity: Math.max(0, (Number(c.quantity) || 0) + d) } : c
-        )
-        .filter((c) => c.quantity > 0)
-    );
+    setCarts((prev) => {
+      const updater = (list) => (list || [])
+        .map((c) => (c.id === id ? { ...c, quantity: Math.max(0, (Number(c.quantity) || 0) + d) } : c))
+        .filter((c) => c.quantity > 0);
+      return { dinein: updater(prev.dinein), takeaway: updater(prev.takeaway) };
+    });
   };
 
   const updateItemQuantity = (id, quantity) => {
     const q = isNaN(Number(quantity)) ? -1 : Number(quantity);
     if (q < 0) return;
-    setCart((prev) => {
-      if (q === 0) {
-        return prev.filter((c) => c.id !== id);
-      }
-      const existing = prev.find((c) => c.id === id);
-      if (existing) {
-        return prev.map((c) => (c.id === id ? { ...c, quantity: q } : c));
-      }
-      return prev;
+    setCarts((prev) => {
+      const updater = (list) => {
+        if (q === 0) return (list || []).filter((c) => c.id !== id);
+        return (list || []).map((c) => (c.id === id ? { ...c, quantity: q } : c));
+      };
+      return { dinein: updater(prev.dinein), takeaway: updater(prev.takeaway) };
     });
   };
 
   const removeCartItem = (id) => {
-    setCart((prev) => prev.filter((c) => c.id !== id));
+    setCarts((prev) => ({
+      dinein: (prev.dinein || []).filter((c) => c.id !== id),
+      takeaway: (prev.takeaway || []).filter((c) => c.id !== id)
+    }));
   };
 
   const updateNote = (id, note) => {
-    setCart((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, note } : c))
-    );
+    setCarts((prev) => ({
+      dinein: (prev.dinein || []).map((c) => (c.id === id ? { ...c, note } : c)),
+      takeaway: (prev.takeaway || []).map((c) => (c.id === id ? { ...c, note } : c))
+    }));
   };
 
   const clearCart = () => {
-    setCart([]);
+    setCarts({ dinein: [], takeaway: [] });
   };
 
   const clearAllCarts = () => {
@@ -127,6 +156,7 @@ export const CartProvider = ({ children }) => {
         cart,
         setCart,
         addToCart,
+        syncCartToOtherMode,
         changeQty,
         updateItemQuantity,
         removeCartItem,

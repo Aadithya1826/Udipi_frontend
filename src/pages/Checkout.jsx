@@ -19,10 +19,10 @@ const Checkout = ({ isTakeaway }) => {
     setIsCartOpen
   } = useCart();
 
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: ''
-  });
+  const [formData, setFormData] = useState(() => ({
+    name: location.state?.formData?.name || sessionStorage.getItem('customer_name') || '',
+    phone: location.state?.formData?.phone || sessionStorage.getItem('customer_phone') || ''
+  }));
   
   const [nameError, setNameError] = useState('');
   const [phoneError, setPhoneError] = useState('');
@@ -43,7 +43,7 @@ const Checkout = ({ isTakeaway }) => {
       setFormData(prev => ({ ...prev, [name]: onlyNums }));
       
       if (hasAttemptedSubmit) {
-        if (!/^[6-9]\d{9}$/.test(onlyNums)) {
+        if (!/^\d{10}$/.test(onlyNums)) {
           setPhoneError(language === 'Tamil' ? 'தயவுசெய்து சரியான தொலைபேசி எண்ணை உள்ளிடவும்.' : 'Please enter a valid phone number.');
         } else {
           setPhoneError('');
@@ -65,7 +65,7 @@ const Checkout = ({ isTakeaway }) => {
 
   const handleBlur = (e) => {
     if (e.target.name === 'phone') {
-      if (formData.phone && !/^[6-9]\d{9}$/.test(formData.phone)) {
+      if (formData.phone && !/^\d{10}$/.test(formData.phone)) {
         setPhoneError(language === 'Tamil' ? 'தயவுசெய்து சரியான தொலைபேசி எண்ணை உள்ளிடவும்.' : 'Please enter a valid phone number.');
       } else {
         setPhoneError('');
@@ -89,7 +89,7 @@ const Checkout = ({ isTakeaway }) => {
     const handleUpdatePhone = (e) => {
       if (e.detail && e.detail.phone) {
         const cleanedPhone = String(e.detail.phone).replace(/\D/g, '');
-        if (/^[6-9]\d{9}$/.test(cleanedPhone)) {
+        if (/^\d{10}$/.test(cleanedPhone)) {
           setFormData(prev => ({ ...prev, phone: cleanedPhone }));
         }
       }
@@ -107,7 +107,7 @@ const Checkout = ({ isTakeaway }) => {
           setNameError('');
         }
         
-        if (!/^[6-9]\d{9}$/.test(currentFormData.phone)) {
+        if (!/^\d{10}$/.test(currentFormData.phone)) {
           setPhoneError(language === 'Tamil' ? 'தயவுசெய்து சரியான தொலைபேசி எண்ணை உள்ளிடவும்.' : 'Please enter a valid phone number.');
           valid = false;
         } else {
@@ -153,7 +153,7 @@ const Checkout = ({ isTakeaway }) => {
       setNameError('');
     }
 
-    if (!/^[6-9]\d{9}$/.test(formData.phone)) {
+    if (!/^\d{10}$/.test(formData.phone)) {
       setPhoneError(language === 'Tamil' ? 'தயவுசெய்து சரியான தொலைபேசி எண்ணை உள்ளிடவும்.' : 'Please enter a valid phone number.');
       valid = false;
     } else {

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
 import '../styles/components.css'
 import dataudipiTitleImg from '../assets/images/Dataudupi-Title.png'
 import udupiBannerImg from '../assets/images/udupi-banner.png'
 
 function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = false, showDateTime = true, hideTableIndicator = false, onTableClick }) {
+  const navigate = useNavigate()
   const { language, setLanguage, t } = useLanguage()
   const [showLangDropdown, setShowLangDropdown] = useState(false)
   const [currentDate, setCurrentDate] = useState('')
@@ -59,7 +61,11 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
       )}
 
       {/* Logo Sign */}
-      <div className={`logo-sign ${shouldUseTitleImage ? 'title-mode' : ''}`}>
+      <div 
+        className={`logo-sign ${shouldUseTitleImage ? 'title-mode' : ''}`}
+        onClick={() => navigate('/')}
+        style={{ cursor: 'pointer' }}
+      >
         <img
           src={shouldUseTitleImage ? dataudipiTitleImg : udupiBannerImg}
           alt="Data Udipi Logo"

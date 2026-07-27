@@ -100,20 +100,8 @@ const TakeAwayOrderSuccess = () => {
     }
   }, [dbStatus]);
 
-  // Simulation Fallback: Automate status progression ONLY if there is no server connection/dbStatus
-  useEffect(() => {
-    if (!isTrackMode || dbStatus) return;
-    const interval = setInterval(() => {
-      setTrackStep(prev => {
-        if (prev < 4) {
-          return prev + 1;
-        }
-        clearInterval(interval);
-        return prev;
-      });
-    }, 8000);
-    return () => clearInterval(interval);
-  }, [isTrackMode, dbStatus]);
+  // Order status is controlled strictly by real DB updates from backend/admin side
+  // Default to step 1 (Order Received) until dbStatus changes
 
   // Automatic Order Status Voice Announcements
   useEffect(() => {
@@ -279,8 +267,8 @@ const TakeAwayOrderSuccess = () => {
 
             {/* Back to Menu link */}
             <div style={{ marginTop: '10px' }}>
-              <button className="os-back-link" onClick={() => navigate('/take-away')}>
-                <i className="fa-solid fa-arrow-left" /> {translate('Back to Menu', 'மெனுவிற்கு திரும்பு')}
+              <button className="os-back-link" onClick={() => navigate('/takeaway-payment')}>
+                <i className="fa-solid fa-arrow-left" /> {translate('Back to Payment', 'கட்டண பக்கத்திற்கு திரும்பு')}
               </button>
             </div>
           </div>

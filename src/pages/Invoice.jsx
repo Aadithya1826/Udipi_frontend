@@ -72,10 +72,19 @@ export default function Invoice({ embeddedData }) {
       handleDownload();
     };
     document.addEventListener('download-invoice', handleVoiceDownload);
+    document.addEventListener('trigger-download-bill', handleVoiceDownload);
+
+    if (location.state?.autoDownload) {
+      setTimeout(() => {
+        handleDownload();
+      }, 500);
+    }
+
     return () => {
       document.removeEventListener('download-invoice', handleVoiceDownload);
+      document.removeEventListener('trigger-download-bill', handleVoiceDownload);
     };
-  }, []);
+  }, [location.state]);
 
   // UPI payment string if method is UPI
   const upiQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=dataudipi@upi%26pn=DataUdipi%26am=${finalTotal.toFixed(2)}%26cu=INR`;
@@ -212,8 +221,8 @@ export default function Invoice({ embeddedData }) {
         </div>
         <div className="download-btn-container" style={{ marginTop: '10px' }}>
           {!isEmbedded && (
-            <button className="download-btn" style={{ backgroundColor: '#ff4e00' }} onClick={() => navigate('/')}>
-              <i className="fa-solid fa-house" style={{ marginRight: '8px' }}></i> Back to Home
+            <button className="download-btn" style={{ backgroundColor: '#ff4e00' }} onClick={() => navigate(location.pathname.includes('takeaway') ? '/takeaway-order-success' : '/order-success')}>
+              <i className="fa-solid fa-arrow-left" style={{ marginRight: '8px' }}></i> Back to Order Status
             </button>
           )}
         </div>

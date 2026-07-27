@@ -26,7 +26,11 @@ const Payment = () => {
   const [selectedMethod, setSelectedMethod] = useState('Cash');
   const [isPollingCash, setIsPollingCash] = useState(false);
 
-  const { formData = {}, autoConfirmMethod } = location.state || {};
+  const { formData: rawFormData = {}, autoConfirmMethod } = location.state || {};
+  const formData = {
+    name: rawFormData.name || sessionStorage.getItem('customer_name') || '',
+    phone: rawFormData.phone || sessionStorage.getItem('customer_phone') || ''
+  };
 
   useEffect(() => {
     if (cart.length === 0) {
@@ -99,8 +103,8 @@ const Payment = () => {
           body: JSON.stringify(orderData)
         });
         const data = await res.json();
-        const dbId = data.order_id || data.id;
-        const generatedOrderId = dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+        const dbId = data.dbOrderId || data.order_id || data.id;
+        const generatedOrderId = data.orderId || (dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`);
 
         if (dbId) {
           navigate('/order-success', {
@@ -157,7 +161,8 @@ const Payment = () => {
         body: JSON.stringify(orderData)
       });
       const orderResult = await orderRes.json();
-      const generatedOrderId = orderResult.order_id || orderResult.id || `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+      const dbId = orderResult.dbOrderId || orderResult.order_id || orderResult.id;
+      const generatedOrderId = orderResult.orderId || (dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`);
 
       // 2. Load Razorpay script
       const res = await new Promise((resolve) => {
@@ -172,7 +177,16 @@ const Payment = () => {
         throw new Error('Razorpay SDK failed to load');
       }
 
-      // 3. Create Razorpay order on backend
+      // 3. Fetch Razorpay Key ID and Create Razorpay order on backend
+      let razorpayKeyId = '';
+      try {
+        const keyRes = await fetch(`/api/razorpay-key`);
+        const keyData = await keyRes.json();
+        razorpayKeyId = keyData.key_id;
+      } catch (keyErr) {
+        console.error('Failed to fetch Razorpay key from backend:', keyErr);
+      }
+
       const rzpOrderRes = await fetch(`/api/create-razorpay-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -184,13 +198,18 @@ const Payment = () => {
         console.warn(rzpOrder.message || 'Failed to create Razorpay order on backend. Falling back to direct client checkout.');
       }
 
+      if (!razorpayKeyId) {
+        throw new Error('Razorpay Key ID is not configured on the backend');
+      }
+
       // 4. Open Razorpay Checkout modal
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        key: razorpayKeyId,
         amount: rzpOrder.success ? rzpOrder.order.amount : total * 100,
         currency: rzpOrder.success ? rzpOrder.order.currency : 'INR',
         name: 'Data Udipi',
         description: 'Food Order Payment',
+        image: '',
         ...(rzpOrder.success && { order_id: rzpOrder.order.id }),
         handler: async function (response) {
           // On successful payment

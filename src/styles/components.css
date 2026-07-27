@@ -59,6 +59,11 @@
     top: -5.5rem;
     left: 50%;
     transform: translateX(-50%);
+    transition: filter 0.2s ease;
+}
+
+.logo-sign:hover {
+    filter: brightness(1.08);
 }
 
 .banner-image {

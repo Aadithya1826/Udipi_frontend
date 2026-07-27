@@ -40,7 +40,6 @@ function Home() {
   }, [])
 
   const handleDineInClick = () => {
-    clearAllCarts()
     setShowScanner(true)
     setScannerError('')
     setManualTable('')
@@ -260,7 +259,6 @@ function Home() {
               <span>{t('dineIn')}</span>
             </button>
             <button className="action-btn" onClick={() => {
-              clearAllCarts()
               navigate('/take-away')
             }}>
               <img src={takeawayLogoImg} alt="Take Away Icon" className="btn-icon-img" />
