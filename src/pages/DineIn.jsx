@@ -20,7 +20,7 @@ if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && !navigator.
   navigator.mediaDevices.getUserMedia.isPatched = true;
 }
 
-function MenuCard({ item, qty, onAdd, onInc, onDec, onUpdateQty }) {
+function MenuCard({ item, qty, onAdd, onInc, onDec, onUpdateQty, hasActiveOrder }) {
   const { t, language } = useLanguage()
   const [imgError, setImgError] = useState(false)
   return (
@@ -57,53 +57,59 @@ function MenuCard({ item, qty, onAdd, onInc, onDec, onUpdateQty }) {
       </div>
 
       <div className="fg-card-controls">
-        <div className="fg-qty-container">
-          <button onClick={() => onDec(item.id)} className="fg-qty-btn minus" disabled={qty === 0}>
-            <span>−</span>
-          </button>
-          <div className="fg-qty-display">
-            <input
-              type="text"
-              inputMode="numeric"
-              value={qty === 0 ? '' : qty}
-              onChange={(e) => {
-                const val = e.target.value;
-                if (val === '') {
-                  if (qty > 0) onUpdateQty(item.id, 0);
-                  return;
-                }
-                const num = parseInt(val, 10);
-                if (!isNaN(num) && num >= 0) {
-                  if (qty === 0 && num > 0) {
-                    onAdd(item, num);
-                  } else {
-                    onUpdateQty(item.id, num);
-                  }
-                }
-              }}
-              onBlur={(e) => {
-                if (e.target.value === '') {
-                  onUpdateQty(item.id, 0);
-                }
-              }}
-              placeholder="0"
-              style={{
-                width: '100%',
-                border: 'none',
-                textAlign: 'center',
-                background: 'transparent',
-                fontWeight: '600',
-                fontFamily: 'inherit',
-                fontSize: '1.2rem',
-                color: '#333',
-                outline: 'none'
-              }}
-            />
+        {hasActiveOrder ? (
+          <div className="fg-qty-container" style={{ opacity: 0.5 }}>
+            <span style={{ fontSize: '0.9rem', color: '#666', fontWeight: 'bold' }}>Active Order In Progress</span>
           </div>
-          <button onClick={() => item.available ? (qty === 0 ? onAdd(item) : onInc(item.id)) : null} className="fg-qty-btn plus" disabled={!item.available}>
-            <span>+</span>
-          </button>
-        </div>
+        ) : (
+          <div className="fg-qty-container">
+            <button onClick={() => onDec(item.id)} className="fg-qty-btn minus" disabled={qty === 0}>
+              <span>−</span>
+            </button>
+            <div className="fg-qty-display">
+              <input
+                type="text"
+                inputMode="numeric"
+                value={qty === 0 ? '' : qty}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    if (qty > 0) onUpdateQty(item.id, 0);
+                    return;
+                  }
+                  const num = parseInt(val, 10);
+                  if (!isNaN(num) && num >= 0) {
+                    if (qty === 0 && num > 0) {
+                      onAdd(item, num);
+                    } else {
+                      onUpdateQty(item.id, num);
+                    }
+                  }
+                }}
+                onBlur={(e) => {
+                  if (e.target.value === '') {
+                    onUpdateQty(item.id, 0);
+                  }
+                }}
+                placeholder="0"
+                style={{
+                  width: '100%',
+                  border: 'none',
+                  textAlign: 'center',
+                  background: 'transparent',
+                  fontWeight: '600',
+                  fontFamily: 'inherit',
+                  fontSize: '1.2rem',
+                  color: '#333',
+                  outline: 'none'
+                }}
+              />
+            </div>
+            <button onClick={() => item.available ? (qty === 0 ? onAdd(item) : onInc(item.id)) : null} className="fg-qty-btn plus" disabled={!item.available}>
+              <span>+</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -127,7 +133,8 @@ export default function DineIn() {
     tableNumber,
     activeCategory,
     setActiveCategory,
-    setTableNumber
+    setTableNumber,
+    hasActiveOrder
   } = useCart()
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -480,7 +487,7 @@ export default function DineIn() {
                       itemToAdd = processedItems[0];
                     }
 
-                    if (itemToAdd && itemToAdd.available) {
+                    if (itemToAdd && itemToAdd.available && !hasActiveOrder) {
                       const qty = getQty(itemToAdd.id);
                       if (qty === 0) {
                         addToCart(itemToAdd);
@@ -504,7 +511,7 @@ export default function DineIn() {
                   <span className="filter-active-dot" />
                 )}
               </button>
-              <button className="di-new-order-btn" onClick={() => { setCart([]); setSearchQuery(''); setIsCartOpen(false); }}>
+              <button className="di-new-order-btn" onClick={() => { setCart([]); setSearchQuery(''); setIsCartOpen(false); }} disabled={hasActiveOrder}>
                 <i className="fa-solid fa-plus" />
                 {t('newOrder')}
               </button>
@@ -559,7 +566,7 @@ export default function DineIn() {
             {displayItems.length === 0
               ? <div className="di-empty">No items found.</div>
               : displayItems.map(item => (
-                <MenuCard key={item.id} item={item} qty={getQty(item.id)} onAdd={addToCart} onInc={id => changeQty(id, 1)} onDec={id => changeQty(id, -1)} onUpdateQty={updateItemQuantity} />
+                <MenuCard key={item.id} item={item} qty={getQty(item.id)} onAdd={addToCart} onInc={id => changeQty(id, 1)} onDec={id => changeQty(id, -1)} onUpdateQty={updateItemQuantity} hasActiveOrder={hasActiveOrder} />
               ))
             }
           </div>
@@ -596,7 +603,7 @@ export default function DineIn() {
           )}
         </div>
 
-        {totalItems > 0 && !isCartOpen && (
+        {totalItems > 0 && !isCartOpen && !hasActiveOrder && (
           <button className="di-view-cart-btn" onClick={() => { setIsCartOpen(true) }}>
             <i className="fa-solid fa-cart-shopping" />
             <span>{t('viewCart')}</span>

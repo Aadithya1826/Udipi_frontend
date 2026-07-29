@@ -107,6 +107,9 @@ const Payment = () => {
         const generatedOrderId = data.orderId || (dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`);
 
         if (dbId) {
+          localStorage.setItem('active_order_id', generatedOrderId);
+          localStorage.setItem('active_order_type', 'dine-in');
+          localStorage.setItem('active_table_number', tableNumber || '06');
           navigate('/order-success', {
             state: {
               orderId: generatedOrderId,
@@ -115,6 +118,9 @@ const Payment = () => {
             }
           });
         } else {
+          localStorage.setItem('active_order_id', generatedOrderId);
+          localStorage.setItem('active_order_type', 'dine-in');
+          localStorage.setItem('active_table_number', tableNumber || '06');
           navigate('/order-success', {
             state: {
               orderId: generatedOrderId,
@@ -212,6 +218,9 @@ const Payment = () => {
         image: '',
         ...(rzpOrder.success && { order_id: rzpOrder.order.id }),
         handler: async function (response) {
+          localStorage.setItem('active_order_id', generatedOrderId);
+          localStorage.setItem('active_order_type', 'dine-in');
+          localStorage.setItem('active_table_number', tableNumber || '06');
           // On successful payment
           navigate('/order-success', {
             state: {

@@ -98,6 +98,11 @@ const TakeAwayOrderSuccess = () => {
     } else if (dbStatus === 'CANCELLED') {
       setTrackStep(0);
     }
+    
+    if (dbStatus === 'SERVED' || dbStatus === 'COMPLETED' || dbStatus === 'CANCELLED') {
+      localStorage.removeItem('active_order_id');
+      localStorage.removeItem('active_order_type');
+    }
   }, [dbStatus]);
 
   // Order status is controlled strictly by real DB updates from backend/admin side

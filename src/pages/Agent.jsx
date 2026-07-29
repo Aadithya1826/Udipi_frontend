@@ -238,8 +238,11 @@ function Agent() {
           };
 
           const result = await placeOrder(orderData);
-          const dbId = result.order_id || result.id;
-          const generatedOrderId = dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+          const dbId = result.dbOrderId || result.order_id || result.id;
+          const generatedOrderId = result.orderId || (dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`);
+          
+          localStorage.setItem('active_order_id', generatedOrderId);
+          localStorage.setItem('active_order_type', 'agent');
           
           navigate('/invoice', { 
             state: { 

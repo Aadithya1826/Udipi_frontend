@@ -14,6 +14,8 @@ import TakeAwayOrderSuccess from './pages/TakeAwayOrderSuccess'
 import Checkout from './pages/Checkout'
 import { CartProvider } from './context/CartContext'
 import AIAssistantOverlay from './components/AIAssistantOverlay'
+import ActiveOrderGuard from './components/ActiveOrderGuard'
+import ActiveOrderBanner from './components/ActiveOrderBanner'
 
 function App() {
   return (
@@ -26,15 +28,16 @@ function App() {
         <Route path="/take-away" element={<TakeAway />} />
         <Route path="/invoice" element={<Invoice />} />
 
-        <Route path="/checkout" element={<Checkout isTakeaway={false} />} />
-        <Route path="/payment" element={<Payment />} />
+        <Route path="/checkout" element={<ActiveOrderGuard><Checkout isTakeaway={false} /></ActiveOrderGuard>} />
+        <Route path="/payment" element={<ActiveOrderGuard><Payment /></ActiveOrderGuard>} />
         <Route path="/order-success" element={<OrderSuccess />} />
         <Route path="/payment-failed" element={<PaymentFailed />} />
 
-        <Route path="/takeaway-checkout" element={<Checkout isTakeaway={true} />} />
-        <Route path="/takeaway-payment" element={<TakeAwayPayment />} />
+        <Route path="/takeaway-checkout" element={<ActiveOrderGuard><Checkout isTakeaway={true} /></ActiveOrderGuard>} />
+        <Route path="/takeaway-payment" element={<ActiveOrderGuard><TakeAwayPayment /></ActiveOrderGuard>} />
         <Route path="/takeaway-order-success" element={<TakeAwayOrderSuccess />} />
       </Routes>
+      <ActiveOrderBanner />
       <AIAssistantOverlay />
       </CartProvider>
     </Router>

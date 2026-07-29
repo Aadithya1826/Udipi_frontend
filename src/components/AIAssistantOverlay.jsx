@@ -192,6 +192,15 @@ const AIAssistantOverlay = () => {
   const currentTurnIdRef = useRef(0);
   const recognitionRef = useRef(null);
   const isRecognizingRef = useRef(false);
+  const forceMediaRecorderRef = useRef(false);
+
+  useEffect(() => {
+    if (navigator.brave && navigator.brave.isBrave) {
+      navigator.brave.isBrave().then(isBrave => {
+        if (isBrave) forceMediaRecorderRef.current = true;
+      }).catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     const stopSpeech = () => {
@@ -232,7 +241,7 @@ const AIAssistantOverlay = () => {
     // 1. PRIMARY ENGINE: Web Speech API (Chrome, Edge, Safari, Mobile Browsers)
     const SpeechRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
 
-    if (SpeechRecognition) {
+    if (SpeechRecognition && !forceMediaRecorderRef.current) {
       try {
         if (recognitionRef.current) {
           try { recognitionRef.current.abort(); } catch (e) { }
@@ -271,8 +280,15 @@ const AIAssistantOverlay = () => {
           console.warn("Speech recognition notice:", event.error);
           isRecognizingRef.current = false;
           setIsListening(false);
-          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-            setIsVoiceMode(false);
+          if (event.error === 'network' || event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            forceMediaRecorderRef.current = true;
+            if (isVoiceMode) {
+              setTimeout(() => {
+                startListening();
+              }, 100);
+            } else {
+              setIsVoiceMode(false);
+            }
           }
         };
 
@@ -830,13 +846,52 @@ const AIAssistantOverlay = () => {
 
     // 3. INTELLIGENT DECISION ENGINE & PROGRESSIVE STEP FLOW
     const isConfirmationUtterance = text.match(/\b(confirm|yes|ok|okay|sure|place order|proceed|correct|yeah|ஆமாம்|உறுதி)\b/i);
+    const wantsToCheckout = text.match(/\b(checkout|pay|payment|bill|place order|confirm order|finish|i am done|im done|done)\b/i) || location.pathname.includes('checkout') || location.pathname.includes('payment');
+    
+    // Check if the user just provided details proactively in this utterance
+    const justProvidedDetails = text.match(/(?:my name is|i am|this is|name is|i just|just|myself|phone|mobile|number|cell|cash|upi|online|card|gpay|phonepe|paytm)/i);
 
     if (activeCartItems.length > 0 || itemsToAdd.length > 0) {
       if (!currentOrderType) {
-        currentOrderType = location.pathname.includes('takeaway') || location.pathname.includes('take-away') ? 'takeaway' : (location.pathname.includes('dine-in') ? 'dine_in' : 'takeaway');
-        sessionStorage.setItem('order_type', currentOrderType);
+        if (location.pathname === '/') {
+          const promptSpeech = language === 'Tamil'
+            ? `நீங்கள் இங்கேயே சாப்பிட (Dine-in) விரும்புகிறீர்களா, அல்லது பார்சல் (Takeaway) வேண்டுமா?`
+            : `Would you like to order for Dine-in or Takeaway?`;
+          setMessages(prev => [...prev, { role: 'model', content: promptSpeech }]);
+          speakText(promptSpeech);
+          return { handled: true };
+        } else {
+          currentOrderType = location.pathname.includes('takeaway') || location.pathname.includes('take-away') ? 'takeaway' : 'dine_in';
+          sessionStorage.setItem('order_type', currentOrderType);
+        }
       }
       const isTakeaway = currentOrderType === 'takeaway';
+
+      // If we just got the order type on the home page, navigate and show the cart/menu!
+      if (location.pathname === '/' && currentOrderType && !wantsToCheckout && !justProvidedDetails) {
+         navigate(isTakeaway ? '/take-away' : '/dine-in');
+         const addedSpeech = language === 'Tamil' ? `உணவுகளை சேர்த்துள்ளேன். வேறு என்ன வேண்டும்?` : `I've added the items. What else would you like?`;
+         setMessages(prev => [...prev, { role: 'model', content: addedSpeech }]);
+         speakText(addedSpeech);
+         
+         if (newlyAddedCartItems.length > 0) {
+             setIsCartOpen(true);
+             setTimeout(() => setIsCartOpen(false), 4000);
+         }
+         return { handled: true };
+      }
+
+      // If they just added an item, but don't want to checkout yet, acknowledge it and let them browse.
+      if (!wantsToCheckout && !justProvidedDetails && !isConfirmationUtterance) {
+          if (newlyAddedCartItems.length > 0) {
+             const addedSpeech = language === 'Tamil' ? `உணவுகளை சேர்த்துள்ளேன். வேறு என்ன வேண்டும்?` : `I've added the items. What else would you like?`;
+             setMessages(prev => [...prev, { role: 'model', content: addedSpeech }]);
+             speakText(addedSpeech);
+             setIsCartOpen(true);
+             setTimeout(() => setIsCartOpen(false), 4000);
+             return { handled: true };
+          }
+      }
 
       // STEP 1: Ask for Name if missing
       if (!currentName) {

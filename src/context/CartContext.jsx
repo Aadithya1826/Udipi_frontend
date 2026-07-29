@@ -149,6 +149,16 @@ export const CartProvider = ({ children }) => {
 
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('all');
+  const [hasActiveOrder, setHasActiveOrder] = useState(false);
+
+  useEffect(() => {
+    const checkActive = () => {
+      setHasActiveOrder(!!localStorage.getItem('active_order_id'));
+    };
+    checkActive();
+    window.addEventListener('storage', checkActive);
+    return () => window.removeEventListener('storage', checkActive);
+  }, []);
 
   return (
     <CartContext.Provider
@@ -173,7 +183,8 @@ export const CartProvider = ({ children }) => {
         isCartOpen,
         setIsCartOpen,
         activeCategory,
-        setActiveCategory
+        setActiveCategory,
+        hasActiveOrder
       }}
     >
       {children}

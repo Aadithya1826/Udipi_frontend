@@ -102,10 +102,12 @@ const TakeAwayPayment = () => {
           body: JSON.stringify(orderData)
         });
         const data = await res.json();
-        const dbId = data.order_id || data.id;
-        const generatedOrderId = dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+        const dbId = data.dbOrderId || data.order_id || data.id;
+        const generatedOrderId = data.orderId || (dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`);
 
         if (dbId) {
+          localStorage.setItem('active_order_id', generatedOrderId);
+          localStorage.setItem('active_order_type', 'takeaway');
           navigate('/takeaway-order-success', {
             state: {
               orderId: generatedOrderId,
@@ -114,6 +116,8 @@ const TakeAwayPayment = () => {
             }
           });
         } else {
+          localStorage.setItem('active_order_id', generatedOrderId);
+          localStorage.setItem('active_order_type', 'takeaway');
           navigate('/takeaway-order-success', {
             state: {
               orderId: generatedOrderId,
@@ -160,7 +164,8 @@ const TakeAwayPayment = () => {
         body: JSON.stringify(orderData)
       });
       const orderResult = await orderRes.json();
-      const generatedOrderId = orderResult.order_id || orderResult.id || `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+      const dbId = orderResult.dbOrderId || orderResult.order_id || orderResult.id;
+      const generatedOrderId = orderResult.orderId || (dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`);
 
       // 2. Load Razorpay script
       const res = await new Promise((resolve) => {
@@ -210,6 +215,8 @@ const TakeAwayPayment = () => {
         image: '',
         order_id: rzpOrder.order.id,
         handler: async function (response) {
+          localStorage.setItem('active_order_id', generatedOrderId);
+          localStorage.setItem('active_order_type', 'takeaway');
           // On successful payment
           navigate('/takeaway-order-success', {
             state: {
