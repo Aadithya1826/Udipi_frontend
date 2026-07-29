@@ -141,13 +141,19 @@ const detectUserLanguage = (text) => {
     'venum', 'seiyavum', 'veinga', 'paarka', 'kattunga', 'serkka', 'add pannu', 'vazhi', 'konjam', 
     'vaanga', 'sollunga', 'sollu', 'podunga', 'yenakku', 'enaku', 'unaku', 'namaku'
   ];
-  if (tanglishKeywords.some(kw => t.includes(kw))) return 'Tanglish';
+  if (tanglishKeywords.some(kw => {
+    const escaped = kw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    return new RegExp(`\\b${escaped}\\b`, 'i').test(t);
+  })) return 'Tanglish';
   
   const hinglishKeywords = [
     'karo', 'kijiye', 'dikhao', 'dikhaye', 'chalo', 'jao', 'lelo', 'kar diya', 'hai', 'ko', 'aur', 
     'ek', 'do', 'teen', 'mujhe', 'mere', 'humare', 'apna', 'dikhana', 'karna', 'krdo'
   ];
-  if (hinglishKeywords.some(kw => t.includes(kw))) return 'Hinglish';
+  if (hinglishKeywords.some(kw => {
+    const escaped = kw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    return new RegExp(`\\b${escaped}\\b`, 'i').test(t);
+  })) return 'Hinglish';
   
   return 'English';
 };
@@ -499,6 +505,8 @@ const AIAssistantOverlay = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const sidebarRef = useRef(null);
+
   const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('active_order_id'));
 
   useEffect(() => {
@@ -657,7 +665,14 @@ const AIAssistantOverlay = () => {
         recognitionRef.current = recognition;
         recognition.continuous = false;
         recognition.interimResults = true;
-        recognition.lang = language === 'Tamil' ? 'ta-IN' : 'en-IN';
+        const langMap = {
+          'Tamil': 'ta-IN',
+          'Hindi': 'hi-IN',
+          'Telugu': 'te-IN',
+          'Kannada': 'kn-IN',
+          'Malayalam': 'ml-IN'
+        };
+        recognition.lang = langMap[language] || 'en-IN';
 
         let capturedText = '';
 
@@ -819,6 +834,27 @@ const AIAssistantOverlay = () => {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [isVoiceMode, isSpeaking, isLoading]);
 
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isOpen && sidebarRef.current && !sidebarRef.current.contains(event.target)) {
+        const triggerBtn = document.querySelector('.ai-trigger-btn');
+        if (triggerBtn && triggerBtn.contains(event.target)) {
+          return;
+        }
+        setIsOpen(false);
+        setIsVoiceMode(false);
+        stopListening(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isOpen]);
+
   const toggleListen = () => {
     if (isVoiceMode) {
       setIsVoiceMode(false);
@@ -861,11 +897,13 @@ const AIAssistantOverlay = () => {
       const englishVoice = getMaleVoice('en');
       const tamilVoice   = getMaleVoice('ta');
 
-      const hasTamil = /[\u0b80-\u0bff]/.test(text);
-      const hasHindi = /[\u0900-\u097f]/.test(text);
-      const hasKannada = /[\u0c80-\u0cff]/.test(text);
-      const hasTelugu = /[\u0c00-\u0c7f]/.test(text);
-      const hasMalayalam = /[\u0d00-\u0d7f]/.test(text);
+      const detectedLang = detectUserLanguage(text);
+      const hasTamil = /[\u0b80-\u0bff]/.test(text) || detectedLang === 'Tamil';
+      const hasHindi = /[\u0900-\u097f]/.test(text) || detectedLang === 'Hindi';
+      const hasKannada = /[\u0c80-\u0cff]/.test(text) || detectedLang === 'Kannada';
+      const hasTelugu = /[\u0c00-\u0c7f]/.test(text) || detectedLang === 'Telugu';
+      const hasMalayalam = /[\u0d00-\u0d7f]/.test(text) || detectedLang === 'Malayalam';
+      const isHinglishOrTanglish = detectedLang === 'Hinglish' || detectedLang === 'Tanglish';
 
       if (hasTamil) {
         if (tamilVoice) utterance.voice = tamilVoice;
@@ -894,6 +932,12 @@ const AIAssistantOverlay = () => {
         const malayalamVoice = getMaleVoice('ml') || englishVoice;
         if (malayalamVoice) utterance.voice = malayalamVoice;
         utterance.lang = 'ml-IN';
+        utterance.pitch = 0.85;
+        utterance.rate = 0.95;
+      } else if (isHinglishOrTanglish) {
+        const indianEngVoice = voices.find(v => v.lang.toLowerCase() === 'en-in') || getMaleVoice('en-IN') || englishVoice;
+        if (indianEngVoice) utterance.voice = indianEngVoice;
+        utterance.lang = 'en-IN';
         utterance.pitch = 0.85;
         utterance.rate = 0.95;
       } else if (language === 'Tamil') {
@@ -982,8 +1026,13 @@ const AIAssistantOverlay = () => {
     }
 
     // 0c. Exempt Navigation & General Commands from Progressive Checkout Hijacking
-    if (text.match(/\b(go\s*home|home|home\s*page|go\s*to\s*home|open\s*menu|show\s*menu|menu|menu\s*page|view\s*cart|open\s*cart|close\s*cart|hide\s*cart|track\s*order|track|tracking|order\s*status|status\s*of\s*order|where\s*is\s*my\s*order|check\s*order|order\s*update|food\s*status|my\s*order|my\s*orders|what\s*are\s*my\s*orders|order\s*details|dine[\s-]*in|dinein|scan\s*qr)\b/i)) {
+    if (flowStage !== 'asked_order_type' && text.match(/\b(go\s*home|home|home\s*page|go\s*to\s*home|open\s*menu|show\s*menu|menu|menu\s*page|view\s*cart|open\s*cart|close\s*cart|hide\s*cart|track\s*order|track|tracking|order\s*status|status\s*of\s*order|where\s*is\s*my\s*order|check\s*order|order\s*update|food\s*status|my\s*order|my\s*orders|what\s*are\s*my\s*orders|order\s*details|dine[\s-]*in|dinein|scan\s*qr)\b/i)) {
       return { handled: false };
+    }
+
+    // 0d. Bypassing direct chatbot checkout flow if user is already on the payment page
+    if (location.pathname.includes('payment')) {
+      return { completed: false, handled: false };
     }
 
     // 1. Extract Items & Quantities
@@ -1598,6 +1647,31 @@ const AIAssistantOverlay = () => {
       }
 
       // STEP 4: Name, Phone, and Payment Method are all present. PLACE ORDER IMMEDIATELY!
+      if (currentPayment === 'UPI') {
+        const paymentRoute = isTakeaway ? '/takeaway-payment' : '/payment';
+        const redirectSpeech = language === 'Tamil'
+          ? "உங்களை ஆன்லைன் கட்டண பக்கத்திற்கு அழைத்துச் செல்கிறோம்."
+          : "Redirecting you to the online payment gateway.";
+
+        setMessages(prev => [...prev, { role: 'model', content: redirectSpeech }]);
+        speakText(redirectSpeech);
+        setIsCartOpen(false);
+        setIsOpen(false);
+
+        // Remove chatbot flow stage so we don't loop
+        sessionStorage.removeItem('chatbot_flow_stage');
+
+        setTimeout(() => {
+          navigate(paymentRoute, {
+            state: {
+              formData: { name: currentName, phone: currentPhone },
+              autoConfirmMethod: 'UPI'
+            }
+          });
+        }, 1000);
+        return { completed: true, handled: true };
+      }
+
       const targetTable = isTakeaway ? 'TakeAway' : (tableNumber || '06');
       const sub = activeItemsToReport.reduce((sum, i) => sum + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
 
@@ -1772,6 +1846,11 @@ const AIAssistantOverlay = () => {
       const pattern = isSpecial ? safeWrong : `\\b${safeWrong}\\b`;
       normalizedText = normalizedText.replace(new RegExp(pattern, 'gi'), right);
     });
+
+    const detectedUserLang = detectUserLanguage(normalizedText);
+    if (detectedUserLang && language !== detectedUserLang) {
+      setLanguage(detectedUserLang);
+    }
 
     const messageId = Date.now();
     currentTurnIdRef.current = messageId;
@@ -2250,7 +2329,8 @@ const AIAssistantOverlay = () => {
     };
 
     try {
-      const apiMessages = messages.map(m => ({
+      // Limit history to last 10 messages to reduce payload size and improve response speed
+      const apiMessages = messages.slice(-10).map(m => ({
         role: m.role === 'model' ? 'model' : 'user',
         parts: [{ text: m.raw || m.content }]
       }));
@@ -2269,7 +2349,7 @@ const AIAssistantOverlay = () => {
           contents: apiMessages,
           generationConfig: {
             temperature: 0.1,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 512,
             responseMimeType: "application/json"
           }
         })
@@ -2343,6 +2423,11 @@ const AIAssistantOverlay = () => {
           const trLower = aiResponse.transcript.toLowerCase();
           setInputText(aiResponse.transcript);
           setMessages(prev => prev.map(m => m.id === messageId ? { ...m, content: aiResponse.transcript } : m));
+
+          const detectedAudioLang = detectUserLanguage(trLower);
+          if (detectedAudioLang && language !== detectedAudioLang) {
+            setLanguage(detectedAudioLang);
+          }
 
           const trCatMatch = findCategoryMatch(trLower);
           if (trCatMatch && !trLower.match(/(cart|basket|order|add|pay|checkout|buy)/i)) {
@@ -2813,7 +2898,7 @@ const AIAssistantOverlay = () => {
       )}
 
       {/* "Original" Style AI Sidebar */}
-      <div className={["ai-sidebar-overlay", isOpen ? 'active' : ''].join(' ')}>
+      <div ref={sidebarRef} className={["ai-sidebar-overlay", isOpen ? 'active' : ''].join(' ')}>
         <div className="ai-sidebar-content-original">
           {/* ── Frosted Hero Section ── */}
           <div className="ai-hero-frosted-original" style={{ height: isVoiceMode ? '270px' : '110px', transition: 'height 0.3s ease' }}>
