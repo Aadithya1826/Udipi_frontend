@@ -57,12 +57,13 @@ export const CartProvider = ({ children }) => {
   };
 
   const addToCart = (item, initialQuantity = 1) => {
+    console.log("addToCart called with item:", item.name, "qty:", initialQuantity, "stack:", new Error().stack);
     const q = isNaN(Number(initialQuantity)) ? 1 : Number(initialQuantity);
     const updateHelper = (prevList) => {
       const existing = prevList.find((c) => c.id === item.id);
       if (existing) {
         return prevList.map((c) =>
-          c.id === item.id ? { ...c, quantity: (Number(c.quantity) || 0) + q } : c
+          c.id === item.id ? { ...c, ...item, quantity: (Number(c.quantity) || 0) + q } : c
         );
       }
       return [...prevList, { ...item, quantity: q, note: '' }];

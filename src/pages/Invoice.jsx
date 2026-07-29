@@ -221,8 +221,12 @@ export default function Invoice({ embeddedData }) {
         </div>
         <div className="download-btn-container" style={{ marginTop: '10px' }}>
           {!isEmbedded && (
-            <button className="download-btn" style={{ backgroundColor: '#ff4e00' }} onClick={() => navigate(location.pathname.includes('takeaway') ? '/takeaway-order-success' : '/order-success')}>
-              <i className="fa-solid fa-arrow-left" style={{ marginRight: '8px' }}></i> Back to Order Status
+            <button className="download-btn" style={{ backgroundColor: '#ff4e00' }} onClick={() => {
+              sessionStorage.removeItem('chatbot_flow_stage');
+              sessionStorage.removeItem('last_placed_order_id');
+              navigate('/');
+            }}>
+              <i className="fa-solid fa-house" style={{ marginRight: '8px' }}></i> Back to Home
             </button>
           )}
         </div>

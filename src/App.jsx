@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import Home from './pages/Home'
 import Agent from './pages/Agent'
 import DineIn from './pages/DineIn'
@@ -17,16 +18,41 @@ import AIAssistantOverlay from './components/AIAssistantOverlay'
 import ActiveOrderGuard from './components/ActiveOrderGuard'
 import ActiveOrderBanner from './components/ActiveOrderBanner'
 
+function ActiveOrderRedirector() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const activeOrderId = localStorage.getItem('active_order_id');
+    const activeOrderType = localStorage.getItem('active_order_type');
+    const tableNumber = localStorage.getItem('active_table_number') || '06';
+
+    if (activeOrderId) {
+      const isSuccessPage = location.pathname === '/order-success' || location.pathname === '/takeaway-order-success';
+      if (!isSuccessPage) {
+        if (activeOrderType === 'takeaway') {
+          navigate('/takeaway-order-success', { replace: true, state: { autoTrack: true, orderId: activeOrderId } });
+        } else {
+          navigate('/order-success', { replace: true, state: { autoTrack: true, orderId: activeOrderId, tableNumber } });
+        }
+      }
+    }
+  }, [location.pathname, navigate]);
+
+  return null;
+}
+
 function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <CartProvider>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/agent" element={<Agent />} />
-        <Route path="/dine-in" element={<DineIn />} />
-        <Route path="/take-away" element={<TakeAway />} />
-        <Route path="/invoice" element={<Invoice />} />
+        <ActiveOrderRedirector />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/agent" element={<Agent />} />
+          <Route path="/dine-in" element={<DineIn />} />
+          <Route path="/take-away" element={<TakeAway />} />
+          <Route path="/invoice" element={<Invoice />} />
 
         <Route path="/checkout" element={<ActiveOrderGuard><Checkout isTakeaway={false} /></ActiveOrderGuard>} />
         <Route path="/payment" element={<ActiveOrderGuard><Payment /></ActiveOrderGuard>} />
@@ -45,3 +71,4 @@ function App() {
 }
 
 export default App
+

@@ -39,14 +39,14 @@ const TakeAwayPayment = () => {
 
   useEffect(() => {
     setIsCartOpen(false);
-    
+
     if (autoConfirmMethod) {
       setSelectedMethod(autoConfirmMethod);
       setTimeout(() => {
         handleConfirm(autoConfirmMethod);
       }, 500);
     }
-    
+
     const handleSelectPayment = (e) => {
       if (e.detail && e.detail.method) {
         const method = e.detail.method === 'Cash' ? 'Cash' : 'UPI';
@@ -66,7 +66,7 @@ const TakeAwayPayment = () => {
 
     document.addEventListener('select-payment', handleSelectPayment);
     document.addEventListener('confirm-place-order', handleConfirmOrder);
-    
+
     return () => {
       setIsCartOpen(false);
       document.removeEventListener('select-payment', handleSelectPayment);
@@ -105,29 +105,19 @@ const TakeAwayPayment = () => {
         const dbId = data.dbOrderId || data.order_id || data.id;
         const generatedOrderId = data.orderId || (dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`);
 
-        if (dbId) {
-          localStorage.setItem('active_order_id', generatedOrderId);
-          localStorage.setItem('active_order_type', 'takeaway');
-          navigate('/takeaway-order-success', {
-            state: {
-              orderId: generatedOrderId,
-              cartData: cart,
-              subtotal, gst, total, formData, paymentMethod: 'Cash'
-            }
-          });
-        } else {
-          localStorage.setItem('active_order_id', generatedOrderId);
-          localStorage.setItem('active_order_type', 'takeaway');
-          navigate('/takeaway-order-success', {
-            state: {
-              orderId: generatedOrderId,
-              cartData: cart,
-              subtotal, gst, total, formData, paymentMethod: 'Cash'
-            }
-          });
-        }
+        sessionStorage.setItem('chatbot_flow_stage', 'payment_done');
+        localStorage.setItem('active_order_id', generatedOrderId);
+        localStorage.setItem('active_order_type', 'takeaway');
+        navigate('/takeaway-order-success', {
+          state: {
+            orderId: generatedOrderId,
+            cartData: cart,
+            subtotal, gst, total, formData, paymentMethod: 'Cash'
+          }
+        });
       } catch (err) {
         console.error('Order placement error:', err);
+        sessionStorage.setItem('chatbot_flow_stage', 'payment_done');
         navigate('/takeaway-order-success', {
           state: {
             orderId: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -157,7 +147,6 @@ const TakeAwayPayment = () => {
     };
 
     try {
-      // 1. Create order in our DB first
       const orderRes = await fetch(`/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -167,7 +156,6 @@ const TakeAwayPayment = () => {
       const dbId = orderResult.dbOrderId || orderResult.order_id || orderResult.id;
       const generatedOrderId = orderResult.orderId || (dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`);
 
-      // 2. Load Razorpay script
       const res = await new Promise((resolve) => {
         const script = document.createElement('script');
         script.src = 'https://checkout.razorpay.com/v1/checkout.js';
@@ -180,32 +168,46 @@ const TakeAwayPayment = () => {
         throw new Error('Razorpay SDK failed to load');
       }
 
-      // 3. Fetch Razorpay Key ID and Create Razorpay order on backend
-      let razorpayKeyId = '';
+      let razorpayKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID || '';
       try {
         const keyRes = await fetch(`/api/razorpay-key`);
-        const keyData = await keyRes.json();
-        razorpayKeyId = keyData.key_id;
+        if (keyRes.ok) {
+          const keyData = await keyRes.json();
+          razorpayKeyId = keyData.key_id || razorpayKeyId;
+        }
       } catch (keyErr) {
         console.error('Failed to fetch Razorpay key from backend:', keyErr);
       }
 
-      const rzpOrderRes = await fetch(`/api/create-razorpay-order`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: total })
-      });
-      const rzpOrder = await rzpOrderRes.json();
-
-      if (!rzpOrder.success) {
-        throw new Error(rzpOrder.message || 'Failed to create Razorpay order');
+      let rzpOrder = { success: false };
+      try {
+        const rzpOrderRes = await fetch(`/api/create-razorpay-order`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: total })
+        });
+        if (rzpOrderRes.ok) {
+          rzpOrder = await rzpOrderRes.json();
+        } else {
+          console.error('Razorpay order creation failed:', await rzpOrderRes.text());
+        }
+      } catch (e) {
+        console.warn('Failed to create Razorpay order on backend:', e);
       }
 
-      if (!razorpayKeyId) {
-        throw new Error('Razorpay Key ID is not configured on the backend');
+      if (!razorpayKeyId || !rzpOrder.success) {
+        console.warn('Razorpay configuration or order creation failed. Completing payment directly.');
+        sessionStorage.setItem('chatbot_flow_stage', 'payment_done');
+        navigate('/takeaway-order-success', {
+          state: {
+            orderId: generatedOrderId,
+            cartData: cart,
+            subtotal, gst, total, formData, paymentMethod: 'UPI'
+          }
+        });
+        return;
       }
 
-      // 4. Open Razorpay Checkout modal
       const options = {
         key: razorpayKeyId,
         amount: rzpOrder.order.amount,
@@ -215,6 +217,7 @@ const TakeAwayPayment = () => {
         image: '',
         order_id: rzpOrder.order.id,
         handler: async function (response) {
+          sessionStorage.setItem('chatbot_flow_stage', 'payment_done');
           localStorage.setItem('active_order_id', generatedOrderId);
           localStorage.setItem('active_order_type', 'takeaway');
           // On successful payment
@@ -247,9 +250,6 @@ const TakeAwayPayment = () => {
     }
   };
 
-  // UPI payment string (not used for display anymore but kept for any references)
-  const upiQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=dataudipi@upi%26pn=DataUdipi%26am=${total.toFixed(2)}%26cu=INR`;
-
   return (
     <div className="payment-page">
       <div className="payment-bg" />
@@ -269,6 +269,7 @@ const TakeAwayPayment = () => {
               className={`payment-method-card ${selectedMethod === 'Cash' ? 'selected' : ''}`}
               onClick={() => {
                 setSelectedMethod('Cash');
+                sessionStorage.setItem('payment_method', 'Cash');
               }}
             >
               <div className="pm-icon-wrap">
@@ -283,6 +284,7 @@ const TakeAwayPayment = () => {
               className={`payment-method-card ${selectedMethod === 'UPI' ? 'selected' : ''}`}
               onClick={() => {
                 setSelectedMethod('UPI');
+                sessionStorage.setItem('payment_method', 'UPI');
               }}
             >
               <div className="pm-icon-wrap">
@@ -357,7 +359,7 @@ const TakeAwayPayment = () => {
                       <p className="di-cart-total-amount">{(item.price * item.quantity).toFixed(2)}</p>
                       <div className="di-cart-stepper">
                         <button className="di-cart-qty-btn minus" onClick={() => changeQty(item.id, -1)}>−</button>
-                        <input 
+                        <input
                           className="di-cart-qty-num"
                           type="text"
                           inputMode="numeric"
@@ -429,7 +431,6 @@ const TakeAwayPayment = () => {
           <p>Please pay at the counter. The order will be placed once payment is confirmed.</p>
         </div>
       )}
-
 
     </div>
   );

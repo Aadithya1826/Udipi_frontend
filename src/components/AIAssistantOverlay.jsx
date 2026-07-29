@@ -13,7 +13,7 @@ const findBestMenuItemMatch = (queryName, itemsList) => {
     .toLowerCase()
     .replace(/th/g, 't')
     .replace(/\s*\(\d+.*?\)/g, '') // remove portion markers like (2), (1 pc), (2 pcs)
-    .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, '')
+    .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -87,19 +87,31 @@ const findBestMenuItemMatch = (queryName, itemsList) => {
   }
 
   // 3. Fallback word overlap score
+  // Requires high overlap in BOTH directions to avoid "kambu dosa" → "gobi masala dosa" false matches
   let bestItem = null;
   let maxScore = 0;
 
   const scoreItem = (target, q) => {
     const tClean = clean(target);
     if (!tClean || !q) return 0;
-    const tWords = tClean.split(' ');
-    const qWords = q.split(' ');
-    let matches = 0;
+    const tWords = tClean.split(' ').filter(w => w.length >= 3);
+    const qWords = q.split(' ').filter(w => w.length >= 3);
+    if (qWords.length === 0) return 0;
+    let forwardMatches = 0;
     qWords.forEach(qw => {
-      if (tWords.some(tw => tw.includes(qw) || qw.includes(tw))) matches++;
+      if (tWords.some(tw => tw === qw || tw.startsWith(qw) || qw.startsWith(tw))) forwardMatches++;
     });
-    return matches / qWords.length;
+    // Also check reverse: how many target words are covered by the query
+    let reverseMatches = 0;
+    if (tWords.length > 0) {
+      tWords.forEach(tw => {
+        if (qWords.some(qw => qw === tw || qw.startsWith(tw) || tw.startsWith(qw))) reverseMatches++;
+      });
+    }
+    const forwardScore = forwardMatches / qWords.length;
+    const reverseScore = tWords.length > 0 ? reverseMatches / tWords.length : 1;
+    // Both directions must be high; this prevents "dosa" in "kambu dosa" matching "gobi masala dosa"
+    return Math.min(forwardScore, reverseScore);
   };
 
   itemsList.forEach(i => {
@@ -110,18 +122,403 @@ const findBestMenuItemMatch = (queryName, itemsList) => {
     }
   });
 
-  if (maxScore >= 0.5) {
+  // Raise threshold to 0.75 to avoid false positive matches on single shared words
+  if (maxScore >= 0.75) {
     return bestItem;
   }
 
   return null;
 };
 
+const detectUserLanguage = (text) => {
+  if (!text) return 'English';
+  const t = text.toLowerCase();
+  if (/[\u0b80-\u0bff]/.test(t)) return 'Tamil';
+  if (/[\u0900-\u097f]/.test(t)) return 'Hindi';
+  
+  const tanglishKeywords = [
+    'pannu', 'pannunga', 'pannitten', 'ponga', 'po', 'irukku', 'iru', 'illai', 'kattu', 'vai', 
+    'venum', 'seiyavum', 'veinga', 'paarka', 'kattunga', 'serkka', 'add pannu', 'vazhi', 'konjam', 
+    'vaanga', 'sollunga', 'sollu', 'podunga', 'yenakku', 'enaku', 'unaku', 'namaku'
+  ];
+  if (tanglishKeywords.some(kw => t.includes(kw))) return 'Tanglish';
+  
+  const hinglishKeywords = [
+    'karo', 'kijiye', 'dikhao', 'dikhaye', 'chalo', 'jao', 'lelo', 'kar diya', 'hai', 'ko', 'aur', 
+    'ek', 'do', 'teen', 'mujhe', 'mere', 'humare', 'apna', 'dikhana', 'karna', 'krdo'
+  ];
+  if (hinglishKeywords.some(kw => t.includes(kw))) return 'Hinglish';
+  
+  return 'English';
+};
+
+const getDynamicResponse = (key, trText, fallbackLang = 'English') => {
+  // 1. Detect user language
+  let userLang = 'English';
+  if (trText) {
+    userLang = detectUserLanguage(trText);
+  } else {
+    userLang = fallbackLang;
+  }
+
+  const dict = {
+    menuNavigating: {
+      Tamil: () => "சரி! மெனு பக்கத்திற்கு செல்கிறோம்.",
+      Tanglish: () => "Got it! Menu page-ku selgirom.",
+      Hindi: () => "ठीक है! मेनू पृष्ठ पर जा रहे हैं।",
+      Hinglish: () => "Got it! Menu page par ja rhe hai.",
+      English: () => "Got it! Taking you to the menu."
+    },
+    askDineInOrTakeawayHome: {
+      Tamil: (desc) => `${desc} ஆர்டர் செய்ய விரும்புகிறீர்களா? Dine-In (உணவகத்தில் சாப்பிட) அல்லது Takeaway (பார்சல்) எந்த முறையில் வேண்டும்?`,
+      Tanglish: (desc) => `Got it! Neenga ${desc} order panna venuma? Dine-In ah illa Takeaway parcel ah?`,
+      Hindi: (desc) => `समझ गया! आप ${desc} ऑर्डर करना चाहते हैं। क्या आप डाइन-इन करना चाहेंगे या टेकअवे?`,
+      Hinglish: (desc) => `Got it! Aap ${desc} order karna chahte hai. Aap Dine-In karenge ya Takeaway parcel?`,
+      English: (desc) => `Got it! You'd like to order ${desc}. Would you like to Dine-In or Takeaway?`
+    },
+    takeawayNavigating: {
+      Tamil: () => "சரி! பார்சல் மெனு பக்கத்திற்கு செல்கிறோம். மேலும் ஏதேனும் ஆர்டர் செய்ய விரும்புகிறீர்களா? இல்லையெனில் 'done' என்று சொல்லுங்கள்.",
+      Tanglish: () => "Got it! Takeaway menu pakkathirku selgirom. Vera edhadhu order seiyya venuma? Illana 'done' sollunga.",
+      Hindi: () => "समझ गया! टेकअवे मेनू पर जा रहे हैं। क्या आप कुछ और ऑर्डर करना चाहते हैं, या चेकआउट करने के लिए 'done' कहें?",
+      Hinglish: () => "Got it! Takeaway menu par ja rhe hai. Kuch aur order karna hai, ya billing ke liye 'done' bole.",
+      English: () => "Got it! Taking you to Takeaway menu. Would you like to order more, or say 'done' to proceed to checkout?"
+    },
+    dineInNavigating: {
+      Tamil: () => "சரி! மெனு பக்கத்திற்கு செல்கிறோம். உங்கள் மேஜையின் QR குறியீட்டை ஸ்கேன் செய்யவும்.",
+      Tanglish: () => "Got it! Dine-In menu selgirom. Table QR code-a scan seiyyavum.",
+      Hindi: () => "समझ गया! डाइन-इन पर जा रहे हैं। कृपया अपनी मेज का क्यूआर कोड स्कैन करें।",
+      Hinglish: () => "Got it! Dine-In menu par ja rhe hai. Table QR code scan kare.",
+      English: () => "Got it! Taking you to Dine-In. Please scan your table QR code or enter the table number."
+    },
+    sayDineInOrTakeaway: {
+      Tamil: () => "Dine-In அல்லது Takeaway என்று சொல்லுங்கள்.",
+      Tanglish: () => "Dine-In ah illa Takeaway-ah nu sollunga.",
+      Hindi: () => "कृपया डाइन-इन या टेकअवे कहें।",
+      Hinglish: () => "Please Dine-In ya Takeaway bataye.",
+      English: () => "Please say Dine-In or Takeaway to continue."
+    },
+    itemsNotOnMenu: {
+      Tamil: (items) => `மன்னிக்கவும், ${items} மெனுவில் இல்லை.`,
+      Tanglish: (items) => `Sorry, ${items} menu-il illai.`,
+      Hindi: (items) => `क्षमा करें, ${items} मेनू में नहीं है।`,
+      Hinglish: (items) => `Sorry, ${items} menu me nahi hai.`,
+      English: (items) => `Sorry, ${items} is not available on our menu.`
+    },
+    itemsAddedAskMore: {
+      Tamil: () => "கார்டில் சேர்க்கப்பட்டது! மேலும் ஏதாவது வேண்டுமா? இல்லையெனில் 'done' என்று சொல்லுங்கள்.",
+      Tanglish: () => "Cart-la add pannitten! Vera enna venum? Illana 'done' nu sollunga.",
+      Hindi: () => "कार्ट में जोड़ दिया गया है! क्या आप कुछ और ऑर्डर करना चाहते हैं? समाप्त होने पर 'done' कहें।",
+      Hinglish: () => "Cart me add kar diya hai! Kuch aur order karna hai? Agar ho gaya toh 'done' bole.",
+      English: () => "Items added! Would you like to order more? Say 'done' or 'no' when finished."
+    },
+    dineInOrTakeawayAsk: {
+      Tamil: () => "நீங்கள் இங்கேயே சாப்பிட (Dine-in) விரும்புகிறீர்களா, அல்லது பார்சல் (Takeaway) வேண்டுமா?",
+      Tanglish: () => "Neenga Dine-in panreengala, illa Takeaway parcel venuma?",
+      Hindi: () => "क्या आप डाइन-इन करना चाहेंगे या टेकअवे?",
+      Hinglish: () => "Aap Dine-in karenge ya Takeaway parcel lenge?",
+      English: () => "Would you like to order for Dine-in or Takeaway?"
+    },
+    itemsAddedWhatElse: {
+      Tamil: () => "உணவுகளை சேர்த்துள்ளேன். வேறு என்ன வேண்டும்?",
+      Tanglish: () => "Items add pannitten. Vera enna venum?",
+      Hindi: () => "मैंने आइटम जोड़ दिए हैं। आपको और क्या चाहिए?",
+      Hinglish: () => "Items add kar diye hai. Aur kya chahiye?",
+      English: () => "I've added the items. What else would you like?"
+    },
+    showingCategory: {
+      Tamil: (cat) => `${cat} வகைகளை காண்பிக்கிறேன்.`,
+      Tanglish: (cat) => `${cat} categories kaamikren.`,
+      Hindi: (cat) => `${cat} की श्रेणियां दिखा रहा हूँ।`,
+      Hinglish: (cat) => `${cat} categories dikha raha hu.`,
+      English: (cat) => `Showing ${cat} items.`
+    },
+    hereIsCart: {
+      Tamil: () => `நிச்சயமாக, இதோ உங்கள் கார்ட்.`,
+      Tanglish: () => `Sure, idho unga cart.`,
+      Hindi: () => `बिल्कुल, यह रही आपकी कार्ट।`,
+      Hinglish: () => `Sure, ye rhi aapki cart.`,
+      English: () => `Sure, here is your cart.`
+    },
+    cartClosed: {
+      Tamil: () => `கார்ட் மூடப்பட்டது.`,
+      Tanglish: () => `Cart moodapattathu.`,
+      Hindi: () => `कार्ट बंद कर दी गई है।`,
+      Hinglish: () => `Cart close kar di hai.`,
+      English: () => `Okay, I've hidden the cart.`
+    },
+    scrollingDown: {
+      Tamil: () => `கீழே நகர்த்துகிறேன்.`,
+      Tanglish: () => `Keezhe scroll seigiren.`,
+      Hindi: () => `नीचे स्क्रॉल कर रहा हूँ।`,
+      Hinglish: () => `Neeche scroll kar raha hu.`,
+      English: () => `Scrolling down.`
+    },
+    scrollingUp: {
+      Tamil: () => `மேலே நகர்த்துகிறேன்.`,
+      Tanglish: () => `Mele scroll seigiren.`,
+      Hindi: () => `ऊपर स्क्रॉल कर रहा हूँ।`,
+      Hinglish: () => `Upar scroll kar raha hu.`,
+      English: () => `Scrolling up.`
+    },
+    goingHome: {
+      Tamil: () => `முகப்பு பக்கத்திற்குச் செல்கிறோம்.`,
+      Tanglish: () => `Home page ku selgirom.`,
+      Hindi: () => `मुख्य पृष्ठ पर जा रहे हैं।`,
+      Hinglish: () => `Home page par ja rhe hai.`,
+      English: () => `Going home.`
+    },
+    startingNewOrder: {
+      Tamil: () => `புதிய ஆர்டரைத் தொடங்குகிறோம்.`,
+      Tanglish: () => `New order start seigirom.`,
+      Hindi: () => `नया ऑर्डर शुरू कर रहे हैं।`,
+      Hinglish: () => `Naya order start kar rhe hai.`,
+      English: () => `Starting new order.`
+    },
+    cartEmpty: {
+      Tamil: () => `உங்கள் கார்ட் காலியாக உள்ளது. தயவுசெய்து முதலில் ஆர்டர் செய்யவும்.`,
+      Tanglish: () => `Unga cart empty ah irukku. Thayavu seithu mudhalil order seiyavum.`,
+      Hindi: () => `आपकी कार्ट खाली है। कृपया पहले कुछ जोड़ें।`,
+      Hinglish: () => `Aapki cart empty hai. Please pehle items add kare.`,
+      English: () => `Your cart is empty. Please add items to your order first.`
+    },
+    alreadyOnPayment: {
+      Tamil: () => `நீங்கள் ஏற்கனவே பணம் செலுத்தும் பக்கத்தில் உள்ளீர்கள்.`,
+      Tanglish: () => `Neengal yerkkanave payment pakkathil ulleergal.`,
+      Hindi: () => `आप पहले से ही भुगतान पृष्ठ पर हैं।`,
+      Hinglish: () => `Aap pehle se hi payment page par hai.`,
+      English: () => `You are already on the payment page.`
+    },
+    placingOrder: {
+      Tamil: () => `ஆர்டர் செய்யப்படுகிறது.`,
+      Tanglish: () => `Order seiyappadugirathu.`,
+      Hindi: () => `आपका ऑर्डर दिया जा रहा है।`,
+      Hinglish: () => `Order place ho raha hai.`,
+      English: () => `Placing your order.`
+    },
+    proceedingToPayment: {
+      Tamil: () => `பணம் செலுத்தும் பக்கத்திற்குச் செல்கிறோம்.`,
+      Tanglish: () => `Payment pakkathirku selgirom.`,
+      Hindi: () => `भुगतान पृष्ठ पर जा रहे हैं।`,
+      Hinglish: () => `Payment page par ja rhe hai.`,
+      English: () => `Proceeding to payment.`
+    },
+    takingToCheckout: {
+      Tamil: () => `முதலில் சரிபார்ப்பு பக்கத்திற்குச் செல்கிறோம்.`,
+      Tanglish: () => `Mudhalil checkout seiyavum.`,
+      Hindi: () => `पहले चेकआउट पर जा रहे हैं।`,
+      Hinglish: () => `Pehle checkout par ja rhe hai.`,
+      English: () => `Taking you to checkout first.`
+    },
+    validPhoneRequired: {
+      Tamil: () => `தயவுசெய்து சரியான 10 இலக்க தொலைபேசி எண்ணை வழங்கவும்.`,
+      Tanglish: () => `Thayavu seithu sariyana 10-digit phone number-ai kooravum.`,
+      Hindi: () => `कृपया एक वैध 10-अंकीय फ़ोन नंबर प्रदान करें।`,
+      Hinglish: () => `Please ek valid 10-digit phone number bataye.`,
+      English: () => `Please provide a valid 10-digit Indian phone number.`
+    },
+    activeOrderExists: {
+      Tamil: () => `உங்களுக்கு ஒரு ஆர்டர் ஏற்கனவே உள்ளது. புதிய ஆர்டர் செய்ய காத்திருக்கவும்.`,
+      Tanglish: () => `Unga active order irukku. Thayavu seithu mudiyum varai kaathirukavum.`,
+      Hindi: () => `आपके पास पहले से ही एक सक्रिय ऑर्डर है। कृपया नया ऑर्डर करने के लिए प्रतीक्षा करें।`,
+      Hinglish: () => `Aapka ek order active hai. Please naya order karne ke liye wait kare.`,
+      English: () => `You currently have an active order. Please wait for it to be completed before placing a new order.`
+    },
+    itemNotAvailable: {
+      Tamil: (item) => `மன்னிக்கவும், ${item} உணவக மெனுவில் இல்லை.`,
+      Tanglish: (item) => `Sorry, ${item} menu-il illai.`,
+      Hindi: (item) => `क्षमा करें, ${item} हमारे मेनू में उपलब्ध नहीं है।`,
+      Hinglish: (item) => `Sorry, ${item} hamare menu me nahi hai.`,
+      English: (item) => `Sorry, ${item} is not available on our menu.`
+    },
+    itemNotInCart: {
+      Tamil: (item) => `உங்கள் கார்ட்டில் ${item} இல்லை.`,
+      Tanglish: (item) => `Ungal cart-il ${item} illai.`,
+      Hindi: (item) => `आपकी कार्ट में ${item} नहीं है।`,
+      Hinglish: (item) => `Aapki cart me ${item} nahi hai.`,
+      English: (item) => `${item} is not in your cart.`
+    },
+    orderCancelled: {
+      Tamil: () => `உங்கள் ஆர்டர் ரத்து செய்யப்பட்டது. கார்ட் காலியாக உள்ளது.`,
+      Tanglish: () => `Ungal order cancel seiyappattathu. Cart kaaliyaaga ullathu.`,
+      Hindi: () => `आपका ऑर्डर रद्द कर दिया गया है और कार्ट खाली कर दी गई है।`,
+      Hinglish: () => `Aapka order cancel kar diya gaya hai aur cart clear ho chuki hai.`,
+      English: () => `Your order has been cancelled and the cart is cleared.`
+    },
+    promptMsg: {
+      Tamil: () => "சொல்லுங்கள், வேறு என்ன வேண்டும்?",
+      Tanglish: () => "Sollunga, vera enna venum?",
+      Hindi: () => "बताएं, आपको और क्या चाहिए?",
+      Hinglish: () => "Bataiye, aapko aur kya chahiye?",
+      English: () => "Yes! How else can I help with your order?"
+    },
+    overviewSpeech: {
+      Tamil: () => "எங்கள் மெனுவில் தோசை, இட்லி, நூடுல்ஸ், காபி, டீ மற்றும் பல உணவுகள் உள்ளன! உங்களுக்கு என்ன வேண்டும்?",
+      Tanglish: () => "Namma menu-la Dosa, Idly, Noodles, Curd Rice, Coffee, Tea ellam irukku! Ungalukku enna venum?",
+      Hindi: () => "हमारे मेनू में डोसा, इडली, नूडल्स, कॉफी, चाय और बहुत कुछ है! आपको क्या चाहिए?",
+      Hinglish: () => "Hamare menu me Dosa, Idli, Noodles, Coffee, Chai aur bohot kuch hai! Aapko kya chahiye?",
+      English: () => "Under our menu, we have Dosa, Idli, Noodles, Coffee, Tea, and more! What would you like to order?"
+    },
+    catOverviewListTamil: {
+      Tamil: (cat, list) => `${cat} பிரிவில் ${list} உள்ளன. இதில் ஏதேனும் சேர்க்க விரும்புகிறீர்களா?`,
+      Tanglish: (cat, list) => `${cat} section-la ${list} irukku. Idhula edhavadhu add panna venuma?`,
+      Hindi: (cat, list) => `${cat} श्रेणी में ${list} उपलब्ध हैं। क्या आप इनमें से कुछ जोड़ना चाहेंगे?`,
+      Hinglish: (cat, list) => `${cat} section me ${list} hai. Kya aap isme se kuch add karna chahenge?`,
+      English: (cat, list) => `Under ${cat}, we have ${list}. Would you like to add any of these to your order?`
+    },
+    catOverviewListOnly: {
+      Tamil: (cat) => `${cat} வகைகளை காண்பிக்கிறேன். உங்களின் தேர்வை கூறவும்.`,
+      Tanglish: (cat) => `${cat} categories kaamikren. Unga choice-a sollunga.`,
+      Hindi: (cat) => `${cat} श्रेणियां दिखा रहा हूँ। कृपया अपनी पसंद बताएं।`,
+      Hinglish: (cat) => `${cat} categories dikha raha hu. Please apni choice bataiye.`,
+      English: (cat) => `Showing ${cat} items. What would you like to add to your order?`
+    },
+    noOrderSpeech: {
+      Tamil: () => "உங்களிடம் தற்போது எந்த ஆர்டரும் இல்லை.",
+      Tanglish: () => "Unga kitta ippo active order edhum illai.",
+      Hindi: () => "आपके पास अभी कोई सक्रिय ऑर्डर नहीं है।",
+      Hinglish: () => "Aapke paas abhi koi active order nahi hai.",
+      English: () => "You don't have any active orders."
+    },
+    statusMsg: {
+      Tamil: () => "நேரடி ஆர்டர் டிராக்கிங் பக்கத்திற்கு செல்கிறோம்.",
+      Tanglish: () => "Live order tracking page-ku selgirom.",
+      Hindi: () => "ऑर्डर स्थिति ट्रैकिंग पृष्ठ पर जा रहे हैं।",
+      Hinglish: () => "Order status tracking page par ja rhe hai.",
+      English: () => "Taking you to live order status tracking page."
+    },
+    statusMsgDetail: {
+      Tamil: (id, status) => `உங்களின் ஆர்டர் (${id}) நிலை: ${status}. நேரடி டிராக்கிங் பார்க்கிறீர்கள்.`,
+      Tanglish: (id, status) => `Unga order (${id}) status: ${status}. Live track seiyalam.`,
+      Hindi: (id, status) => `आपके ऑर्डर (${id}) की स्थिति है: ${status}। लाइव ट्रैकिंग खोल रहे हैं।`,
+      Hinglish: (id, status) => `Aapke order (${id}) ka status ${status} hai. Live tracking open kar rhe hai.`,
+      English: (id, status) => `Your order (${id}) status is: ${status}. Opening live tracking for you.`
+    },
+    downloadBillSpeech: {
+      Tamil: () => "நிச்சயமாக! உங்களின் ரசீது பதிவிறக்கம் செய்யப்படுகிறது.",
+      Tanglish: () => "Sure! Ungal bill download seiyappadugirathu.",
+      Hindi: () => "बिल्कुल! आपका बिल डाउनलोड किया जा रहा है।",
+      Hinglish: () => "Sure! Aapka bill download ho raha hai.",
+      English: () => "Sure! Downloading your bill now."
+    },
+    greetingMessage: {
+      Tamil: () => "வணக்கம்! டேட்டா உடுப்பி உணவகத்திற்கு வரவேற்கிறோம். இன்று உங்களுக்கு என்ன உணவுகள் வேண்டும்?",
+      Tanglish: () => "Vanakkam! Data Udupi Restaurant-ku varaverkirom. Inniku ungalukku enna venum?",
+      Hindi: () => "नमस्ते! डेटा उडुपी रेस्तरां में आपका स्वागत है। आज आप क्या ऑर्डर करना चाहेंगे?",
+      Hinglish: () => "Namaste! Data Udupi Restaurant me aaj aap kya order karna chahenge?",
+      English: () => "Hello! Welcome to Data Udupi Restaurant. What would you like to order today?"
+    },
+    selectPaymentPrompt: {
+      Tamil: (method) => `${method} தேர்ந்தெடுக்கப்பட்டது. தயவுசெய்து 'Place order' என்று கூறவும்.`,
+      Tanglish: (method) => `${method} select seiyappattathu. Please 'Place order' sollunga.`,
+      Hindi: (method) => `${method} चुना गया। ऑर्डर देने के लिए 'Place order' कहें।`,
+      Hinglish: (method) => `${method} select ho gaya. Order confirm karne ke liye 'Place order' bole.`,
+      English: (method) => `Selected ${method}. Say 'Place order' to confirm.`
+    },
+    enterNameAndPhonePrompt: {
+      Tamil: () => "தயவுசெய்து உங்கள் பெயர் மற்றும் 10 இலக்க தொலைபேசி எண்ணை முதலில் கூறவும்.",
+      Tanglish: () => "Thayavu seithu ungal peyar matrum 10-digit phone number-ai mudhalil kooravum.",
+      Hindi: () => "कृपया पहले अपना नाम और 10-अंकीय फ़ोन नंबर बताएं।",
+      Hinglish: () => "Please pehle apna naam aur 10-digit phone number bataiye.",
+      English: () => "Please tell me your valid name and 10-digit phone number first."
+    },
+    goBackPrompt: {
+      Tamil: () => "முந்தைய பக்கத்திற்கு செல்கிறோம்.",
+      Tanglish: () => "Mundhaiya pakkathirku selgirom.",
+      Hindi: () => "पिछले पृष्ठ पर जा रहे हैं।",
+      Hinglish: () => "Pehle wale page par ja rhe hai.",
+      English: () => "Going to previous page."
+    },
+    goBackInvoicePrompt: {
+      Tamil: () => "ஆர்டர் நிலை பக்கத்திற்கு செல்கிறோம்.",
+      Tanglish: () => "Order tracking pakkathirku selgirom.",
+      Hindi: () => "ऑर्डर ट्रैकिंग पृष्ठ पर जा रहे हैं।",
+      Hinglish: () => "Order status page par ja rhe hai.",
+      English: () => "Returning to Order Status page."
+    },
+    goBackPaymentPrompt: {
+      Tamil: () => "கட்டண பக்கத்திற்கு செல்கிறோம்.",
+      Tanglish: () => "Payment pakkathirku selgirom.",
+      Hindi: () => "भुगतान पृष्ठ पर जा रहे हैं।",
+      Hinglish: () => "Payment page par ja rhe hai.",
+      English: () => "Returning to Payment page."
+    },
+    goBackCheckoutPrompt: {
+      Tamil: () => "செக்அவுட் பக்கத்திற்கு செல்கிறோம்.",
+      Tanglish: () => "Checkout pakkathirku selgirom.",
+      Hindi: () => "चेकआउट पृष्ठ पर जा रहे हैं।",
+      Hinglish: () => "Checkout page par ja rhe hai.",
+      English: () => "Returning to Checkout page."
+    },
+    goBackMenuPrompt: {
+      Tamil: () => "மெனு பக்கத்திற்கு செல்கிறோம்.",
+      Tanglish: () => "Menu pakkathirku selgirom.",
+      Hindi: () => "मेनू पृष्ठ पर जा रहे हैं।",
+      Hinglish: () => "Menu page par ja rhe hai.",
+      English: () => "Returning to Menu page."
+    },
+    askNamePrompt: {
+      Tamil: () => "உங்களின் ஆர்டரைத் தொடர தயவுசெய்து உங்கள் பெயரை சொல்லவும்.",
+      Tanglish: () => "Unga order proceed panna, unga full name-ai sollunga.",
+      Hindi: () => "अपना ऑर्डर प्रोसेस करने के लिए कृपया अपना पूरा नाम बताएं।",
+      Hinglish: () => "Apna order proceed karne ke liye please apna full naam bataiye.",
+      English: () => "To process your order, please tell me your full name."
+    },
+    askPhonePrompt: {
+      Tamil: (name) => `நன்றி ${name}! தயவுசெய்து உங்கள் 10-இலக்க தொலைபேசி எண்ணை சொல்லவும்.`,
+      Tanglish: (name) => `Thank you ${name}! Thayavu seithu ungal 10-digit phone number-ai sollunga.`,
+      Hindi: (name) => `धन्यवाद ${name}! कृपया अपना 10-अंकीय फ़ोन नंबर बताएं।`,
+      Hinglish: (name) => `Thank you ${name}! Please apna 10-digit phone number bataiye.`,
+      English: (name) => `Thank you ${name}! Please tell me your 10-digit phone number.`
+    },
+    askPaymentPrompt: {
+      Tamil: (name) => `நன்றி ${name}! உங்கள் ஆர்டருக்கு Cash mode அல்லது UPI mode எந்த முறையில் செலுத்த விரும்புகிறீர்கள்?`,
+      Tanglish: (name) => `Thank you ${name}! Ungal order-ku Cash mode-la pay panreengala illa UPI mode-la pay panreengala?`,
+      Hindi: (name) => `धन्यवाद ${name}! क्या आप कैश या यूपीआई मोड से भुगतान करना चाहेंगे?`,
+      Hinglish: (name) => `Thank you ${name}! Aap Cash mode se pay karna chahenge ya UPI mode se?`,
+      English: (name) => `Thank you ${name}! Would you like to pay using Cash mode or UPI mode?`
+    },
+    orderSuccessPrompt: {
+      Tamil: (name, id, method) => `நன்றி ${name}! உங்களின் ஆர்டர் (${id}) வெற்றிகரமாக பெறப்பட்டது.`,
+      Tanglish: (name, id, method) => `Thank you ${name}! Ungal order (${id}) successfully place aagiruchu via ${method} mode.`,
+      Hindi: (name, id, method) => `धन्यवाद ${name}! आपका ऑर्डर (${id}) ${method} के माध्यम से सफलतापूर्वक स्वीकार कर लिया गया है।`,
+      Hinglish: (name, id, method) => `Thank you ${name}! Aapka order (${id}) successfully place ho gaya hai via ${method} mode.`,
+      English: (name, id, method) => `Thank you ${name}! Your order (${id}) has been placed successfully via ${method} mode. Tracking your order now.`
+    }
+  };
+
+  const record = dict[key];
+  if (!record) return () => '';
+
+  const fn = record[userLang] || record['English'];
+  return fn;
+};
+
 const AIAssistantOverlay = () => {
   const { language, setLanguage, t } = useLanguage();
-  const { cart, setCart, addToCart, changeQty, updateItemQuantity, removeCartItem, updateNote, tableNumber, clearCart, clearAllCarts, isCartOpen, setIsCartOpen, setActiveCategory } = useCart();
+  const { cart, setCart, addToCart, changeQty, updateItemQuantity, removeCartItem, updateNote, tableNumber, setTableNumber, clearCart, clearAllCarts, isCartOpen, setIsCartOpen, setActiveCategory } = useCart();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const [activeOrderId, setActiveOrderId] = useState(() => localStorage.getItem('active_order_id'));
+
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setActiveOrderId(localStorage.getItem('active_order_id'));
+    };
+    window.addEventListener('storage', handleStorageChange);
+    const interval = setInterval(handleStorageChange, 500);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+  useEffect(() => {
+    if (!activeOrderId && sessionStorage.getItem('chatbot_flow_stage') === 'payment_done') {
+      sessionStorage.removeItem('chatbot_flow_stage');
+    }
+  }, [activeOrderId]);
+
   const [isOpen, setIsOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isVoiceMode, setIsVoiceMode] = useState(false);
@@ -146,8 +543,10 @@ const AIAssistantOverlay = () => {
     async function fetchMenu() {
       try {
         const catRes = await fetch('/api/v1/public/menu/categories');
+        if (!catRes.ok) return;
         const dbCategories = await catRes.json();
         const itemRes = await fetch('/api/v1/public/menu/items');
+        if (!itemRes.ok) return;
         const dbItems = await itemRes.json();
 
         const formattedCategories = [
@@ -156,11 +555,12 @@ const AIAssistantOverlay = () => {
         ];
 
         const formattedItems = dbItems.map(item => ({
-          id: Number(item.id),
+          id: Number(item.id || item.item_id),
           name: item.name,
-          tamilName: item.name,
+          tamilName: item.tamil_name || item.name,
           price: isNaN(Number(item.price)) ? 0 : Number(item.price),
-          category: String(item.category_id)
+          category: String(item.category_id),
+          image: item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `${import.meta.env.VITE_API_URL || ''}${item.image_url}`) : null
         }));
 
         setMenuCategories(formattedCategories);
@@ -210,15 +610,21 @@ const AIAssistantOverlay = () => {
     window.addEventListener('touchstart', stopSpeech);
 
     const hasGreeted = sessionStorage.getItem('ai_has_greeted');
-    const isDineIn = location.pathname === '/' || location.pathname === '/dine-in';
+    const isGreetingPath = location.pathname === '/' || location.pathname === '/dine-in' || location.pathname === '/take-away' || location.pathname === '/takeaway';
 
-    if (isDineIn && !hasGreeted) {
+    if (isGreetingPath && !hasGreeted) {
       const timer = setTimeout(() => {
         const greeting = language === 'Tamil'
           ? "வணக்கம்! டேட்டா உடுப்பிக்கு உங்களை வரவேற்கிறோம். எங்களின் புதிய சைவ உணவுகளைப் பார்த்து மகிழுங்கள். உங்களுக்கு ஏதேனும் உதவி தேவைப்பட்டால் சொல்லுங்கள்."
           : "Vanakkam! Welcome to Data Udipi. Explore our freshly prepared vegetarian dishes. Let me know if you need any help.";
         setMessages([{ role: 'model', content: greeting }]);
+        
+        // Voice out the greeting using speakText to manage mic state
+        speakText(greeting);
+
         sessionStorage.setItem('ai_has_greeted', 'true');
+        setIsOpen(true);
+        setIsVoiceMode(true);
       }, 1500);
       return () => { clearTimeout(timer); window.removeEventListener('mousedown', stopSpeech); window.removeEventListener('touchstart', stopSpeech); };
     }
@@ -431,81 +837,98 @@ const AIAssistantOverlay = () => {
 
       const voices = window.speechSynthesis.getVoices();
 
-      const langMap = { 'English': 'en-IN', 'Tamil': 'ta-IN', 'Hindi': 'hi-IN', 'Malayalam': 'ml-IN', 'Telugu': 'te-IN', 'Kannada': 'kn-IN' };
-      const targetLang = langMap[language] || 'en-IN';
-      const targetPrefix = targetLang.split('-')[0];
+      // Helper: pick best male voice for a given lang prefix
+      const getMaleVoice = (langPrefix) => {
+        const maleKeywords = ['male', 'david', 'daniel', 'james', 'mark', 'alex', 'rishi', 'google uk english male', 'microsoft david', 'microsoft james', 'microsoft mark'];
+        // 1. Explicit male keyword match
+        let voice = voices.find(v => {
+          const n = v.name.toLowerCase();
+          return v.lang.startsWith(langPrefix) && maleKeywords.some(k => n.includes(k));
+        });
+        if (voice) return voice;
+        // 2. Exclude obvious female voices, take first remaining for this lang
+        const femaleKeywords = ['female', 'zira', 'samantha', 'cortana', 'siri', 'sangeeta', 'latha', 'vani', 'heera', 'kalpana'];
+        voice = voices.find(v => {
+          const n = v.name.toLowerCase();
+          return v.lang.startsWith(langPrefix) && !femaleKeywords.some(k => n.includes(k));
+        });
+        if (voice) return voice;
+        // 3. Fallback: any voice for this lang
+        return voices.find(v => v.lang.startsWith(langPrefix)) || null;
+      };
 
-      if (language === 'Tamil') {
-        const tamilVoice = voices.find(v =>
-          v.lang.startsWith('ta') && (
-            v.name.toLowerCase().includes('google') ||
-            v.name.toLowerCase().includes('valluvar') ||
-            v.name.toLowerCase().includes('natural') ||
-            v.name.toLowerCase().includes('female') ||
-            v.name.toLowerCase().includes('sangeeta') ||
-            v.name.toLowerCase().includes('vani') ||
-            v.name.toLowerCase().includes('latha')
-          )
-        ) || voices.find(v => v.lang.startsWith('ta'));
+      // Consistent Male Voice Selection throughout the app
+      const englishVoice = getMaleVoice('en');
+      const tamilVoice   = getMaleVoice('ta');
 
+      const hasTamil = /[\u0b80-\u0bff]/.test(text);
+      const hasHindi = /[\u0900-\u097f]/.test(text);
+      const hasKannada = /[\u0c80-\u0cff]/.test(text);
+      const hasTelugu = /[\u0c00-\u0c7f]/.test(text);
+      const hasMalayalam = /[\u0d00-\u0d7f]/.test(text);
+
+      if (hasTamil) {
         if (tamilVoice) utterance.voice = tamilVoice;
         utterance.lang = 'ta-IN';
-        utterance.pitch = 1.0;
-        utterance.rate = 0.95; // Smooth natural local Tamil speech flow
-      } else if (language !== 'English') {
-        const regionalVoice = voices.find(v =>
-          v.lang.startsWith(targetPrefix) && (v.name.toLowerCase().includes('google') || v.name.toLowerCase().includes('natural'))
-        ) || voices.find(v => v.lang.startsWith(targetPrefix));
-
-        if (regionalVoice) utterance.voice = regionalVoice;
-        utterance.lang = targetLang;
-        utterance.pitch = 1.0;
+        utterance.pitch = 0.85;
+        utterance.rate = 0.95;
+      } else if (hasHindi) {
+        const hindiVoice = getMaleVoice('hi') || englishVoice;
+        if (hindiVoice) utterance.voice = hindiVoice;
+        utterance.lang = 'hi-IN';
+        utterance.pitch = 0.85;
+        utterance.rate = 0.95;
+      } else if (hasKannada) {
+        const kannadaVoice = getMaleVoice('kn') || englishVoice;
+        if (kannadaVoice) utterance.voice = kannadaVoice;
+        utterance.lang = 'kn-IN';
+        utterance.pitch = 0.85;
+        utterance.rate = 0.95;
+      } else if (hasTelugu) {
+        const teluguVoice = getMaleVoice('te') || englishVoice;
+        if (teluguVoice) utterance.voice = teluguVoice;
+        utterance.lang = 'te-IN';
+        utterance.pitch = 0.85;
+        utterance.rate = 0.95;
+      } else if (hasMalayalam) {
+        const malayalamVoice = getMaleVoice('ml') || englishVoice;
+        if (malayalamVoice) utterance.voice = malayalamVoice;
+        utterance.lang = 'ml-IN';
+        utterance.pitch = 0.85;
+        utterance.rate = 0.95;
+      } else if (language === 'Tamil') {
+        if (tamilVoice) utterance.voice = tamilVoice;
+        utterance.lang = 'ta-IN';
+        utterance.pitch = 0.85;
+        utterance.rate = 0.95;
+      } else if (language === 'English') {
+        if (englishVoice) utterance.voice = englishVoice;
+        utterance.lang = 'en-US';
+        utterance.pitch = 0.85;
         utterance.rate = 0.95;
       } else {
-        const requestedVoice = voices.find(v => {
-          const n = v.name.toLowerCase();
-          return n.includes('charon') || n.includes('achird') || n.includes('sulafat') || n.includes('aoede');
-        });
-
-        if (requestedVoice) {
-          utterance.voice = requestedVoice;
-          const vName = requestedVoice.name.toLowerCase();
-          if (vName.includes('sulafat')) {
-            utterance.pitch = 1.0;
-            utterance.rate = 0.95;
-          } else if (vName.includes('aoede')) {
-            utterance.pitch = 1.25;
-            utterance.rate = 1.05;
-          } else if (vName.includes('charon')) {
-            utterance.pitch = 0.95;
-            utterance.rate = 1.0;
-          } else {
-            utterance.pitch = 1.1;
-            utterance.rate = 1.0;
-          }
-        } else {
-          const friendlyFemaleVoice = voices.find(v => {
-            const n = v.name.toLowerCase();
-            return n.includes('female') || n.includes('sangeeta') || n.includes('natural') || n.includes('google us english') || n.includes('google uk english female') || n.includes('zira') || n.includes('samantha');
-          }) || voices.find(v => v.lang.startsWith('en'));
-          if (friendlyFemaleVoice) utterance.voice = friendlyFemaleVoice;
-          utterance.lang = 'en-IN';
-          utterance.pitch = 1.05;
-          utterance.rate = 0.95;
-        }
+        const langMap = { 'Hindi': 'hi-IN', 'Malayalam': 'ml-IN', 'Telugu': 'te-IN', 'Kannada': 'kn-IN' };
+        const targetLang = langMap[language] || 'en-IN';
+        const targetPrefix = targetLang.split('-')[0];
+        const regionalVoice = getMaleVoice(targetPrefix) || getMaleVoice('en');
+        if (regionalVoice) utterance.voice = regionalVoice;
+        utterance.lang = targetLang;
+        utterance.pitch = 0.85;
+        utterance.rate = 0.95;
       }
 
       const textLower = text.toLowerCase();
       if (textLower.includes('welcome') || textLower.includes('hello') || textLower.includes('hi') || textLower.includes('vanakkam')) {
-        utterance.rate = 0.95; // Greetings
+        utterance.rate = 0.90; // Greetings — slightly slower
       } else if (textLower.includes('bill') || textLower.includes('total') || textLower.includes('rs') || textLower.includes('₹') || textLower.includes('rupee')) {
-        utterance.rate = 0.95; // Bill amount
+        utterance.rate = 0.90; // Bill amount
       } else if (textLower.includes('important') || textLower.includes('sorry') || textLower.includes('apologize') || textLower.includes('unfortunately')) {
-        utterance.rate = 0.9; // Important/Apology
+        utterance.rate = 0.88; // Important/Apology
       } else {
-        utterance.rate = 1.0; // Normal conversation
+        utterance.rate = 0.95; // Normal conversation
       }
-      utterance.pitch = 1.1;
+      // Keep pitch low for a consistent deep male voice
+      utterance.pitch = 0.85;
 
       // Manually set isSpeaking
       setIsSpeaking(true);
@@ -528,25 +951,38 @@ const AIAssistantOverlay = () => {
     }
   };
 
+
   const executeDirectOrderOrPrompt = async (rawText, parsedActions = []) => {
     const text = (rawText || '').toLowerCase();
 
     // 0a. Handle Clear Cart / Reset Order commands explicitly
-    if (text.match(/\b(clear\s*cart|empty\s*cart|clear\s*all|new\s*order|start\s*over|cancel\s*order|reset\s*cart)\b/i)) {
+    if (text.match(/\b(clear\s*cart|empty\s*cart|clear\s*all|new\s*order|start\s*over|cancel\s*order|reset\s*cart|cancel\s*my\s*order|cancel\s*orders|cancel\s*my\s*orders)\b/i) || text.match(/\b(cancel|clear)\b.*\b(order|orders|cart)\b/i)) {
       clearAllCarts();
       clearCart();
       sessionStorage.removeItem('customer_name');
       sessionStorage.removeItem('customer_phone');
       sessionStorage.removeItem('payment_method');
       sessionStorage.removeItem('order_type');
+      sessionStorage.removeItem('chatbot_flow_stage');
+      sessionStorage.removeItem('chatbot_pending_items');
       const speech = language === 'Tamil' ? "உங்கள் கார்ட் காலியாக்கப்பட்டது. புதிய ஆர்டரை தொடங்கலாம்." : "I've cleared your cart. You can start a new order!";
       setMessages(prev => [...prev, { role: 'model', content: speech }]);
       speakText(speech);
       return { completed: true, handled: true };
     }
 
-    // 0b. Exempt Navigation & General Commands from Progressive Checkout Hijacking
-    if (text.match(/\b(go\s*home|home|home\s*page|go\s*to\s*home|open\s*menu|show\s*menu|menu|menu\s*page|view\s*cart|open\s*cart|close\s*cart|hide\s*cart|track\s*order)\b/i)) {
+    // 0b. PAYMENT_DONE LOCK — block all navigation/ordering after payment is confirmed
+    const flowStage = sessionStorage.getItem('chatbot_flow_stage') || 'idle';
+    if (flowStage === 'payment_done') {
+      // Only pass through track-order intent; block everything else
+      if (!text.match(/\b(track|tracking|order status|status|where is my order|check order)\b/i)) {
+        return { completed: false, handled: false };
+      }
+      return { handled: false };
+    }
+
+    // 0c. Exempt Navigation & General Commands from Progressive Checkout Hijacking
+    if (text.match(/\b(go\s*home|home|home\s*page|go\s*to\s*home|open\s*menu|show\s*menu|menu|menu\s*page|view\s*cart|open\s*cart|close\s*cart|hide\s*cart|track\s*order|track|tracking|order\s*status|status\s*of\s*order|where\s*is\s*my\s*order|check\s*order|order\s*update|food\s*status|my\s*order|my\s*orders|what\s*are\s*my\s*orders|order\s*details|dine[\s-]*in|dinein|scan\s*qr)\b/i)) {
       return { handled: false };
     }
 
@@ -575,6 +1011,8 @@ const AIAssistantOverlay = () => {
     const normalizeSpeechAndNumbers = (str) => {
       if (!str) return '';
       return str
+        .replace(/venum\b/gi, '')
+        .replace(/vendum\b/gi, '')
         .replace(/\*{2,}/g, 'mushroom')
         .replace(/\bshroom\b/gi, 'mushroom')
         .replace(/\bmusroom\b/gi, 'mushroom')
@@ -594,25 +1032,151 @@ const AIAssistantOverlay = () => {
     // Clean possessive apostrophes & normalize word numbers/speech censorship
     const cleanedTextForItems = normalizeSpeechAndNumbers(text).replace(/'s\b/gi, 's').replace(/'/g, '');
 
-    const itemRegex = /(\d+)\s+([a-zA-Z\s]+?)(?=\s*(?:and|,|my name|phone|number|mode|cash|upi|for|takeaway|dine-in|parcel|$))/gi;
+    // PROACTIVE EXTRACTION
+    let currentName = sessionStorage.getItem('customer_name') || '';
+
+    if (currentName.match(/\b(download|bill|invoice|mail|buddy|track|status|checkout|payment|home|cart|parcel)\b/i)) {
+      currentName = '';
+      sessionStorage.removeItem('customer_name');
+    }
+
+    const namePrefixMatch = text.match(/(?:my name is|i am|this is|name is|i just|just|myself|i'm|iam|enoda per|en peyar|yennoda peru|per|name|peru)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)*?)(?=\s*(?:and|,|\.|\?|!|phone|mobile|number|mode|cash|upi|in\s+(?:takeaway|take-away|dine|dine-in|parcel)|for\s+(?:takeaway|take-away|dine|dine-in|parcel)|from\s+\w|at\s+\w|takeaway|take-away|dine-in|parcel|$))/i);
+
+    if (namePrefixMatch) {
+      const extracted = namePrefixMatch[1].trim();
+      if (!extracted.match(/\b(download|bill|invoice|mail|buddy|track|status|checkout|payment|home|cart|parcel|takeaway|take-away|dine|dinein)\b/i)) {
+        currentName = extracted;
+      }
+    }
+
+    if (currentName) {
+      // Clean conversational filler words and any leaked order-type terms
+      currentName = currentName
+        .replace(/\b(actually|basically|please|bro|dude|sir|maam|here|only|no|yeah|its|it's|btw|by the way|aprm|appuram|aparam|enoda|yennoda|ennoda|my|then|and|also|in|for|from|at|takeaway|take-away|dine-in|dine|dinein|parcel)\b/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (currentName && !currentName.match(/\b(download|bill|invoice|mail|buddy|track|status|checkout|payment|home|cart|parcel|takeaway|take-away|dine|dinein)\b/i)) {
+        sessionStorage.setItem('customer_name', currentName);
+        document.dispatchEvent(new CustomEvent('update-name', { detail: { name: currentName } }));
+      } else {
+        currentName = '';
+        sessionStorage.removeItem('customer_name');
+      }
+    }
+
+    let currentPhone = sessionStorage.getItem('customer_phone') || '';
+    const rawDigits = text.replace(/\D/g, '');
+    const phoneMatch = text.match(/(?:phone|mobile|number|cell)?\s*(?:is)?\s*(\d{10})/i);
+    if (phoneMatch) {
+      currentPhone = phoneMatch[1];
+      sessionStorage.setItem('customer_phone', currentPhone);
+      document.dispatchEvent(new CustomEvent('update-phone', { detail: { phone: currentPhone } }));
+    } else if (rawDigits.length >= 10) {
+      currentPhone = rawDigits.slice(-10);
+      sessionStorage.setItem('customer_phone', currentPhone);
+      document.dispatchEvent(new CustomEvent('update-phone', { detail: { phone: currentPhone } }));
+    }
+
+    let currentPayment = sessionStorage.getItem('payment_method') || '';
+    if (text.match(/\b(cash|cache|catch)\b/i)) {
+      currentPayment = 'Cash';
+      sessionStorage.setItem('payment_method', 'Cash');
+      document.dispatchEvent(new CustomEvent('select-payment', { detail: { method: 'Cash' } }));
+    } else if (text.match(/\b(upi|online|card|gpay|phonepe|paytm)\b/i)) {
+      currentPayment = 'UPI';
+      sessionStorage.setItem('payment_method', 'UPI');
+      document.dispatchEvent(new CustomEvent('select-payment', { detail: { method: 'UPI' } }));
+    }
+
+    let currentOrderType = sessionStorage.getItem('order_type') || '';
+    if (text.match(/\b(parcel|takeaway|take-away|pack|packing|packet|to go)\b/i)) {
+      currentOrderType = 'takeaway';
+      sessionStorage.setItem('order_type', 'takeaway');
+    } else if (text.match(/\b(dine-in|dine in|dinein|table|eat in|here|seating)\b/i)) {
+      currentOrderType = 'dine_in';
+      sessionStorage.setItem('order_type', 'dine_in');
+    }
+
+
+    const normalizeForDedup = (s) => (s || '').toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, ' ').replace(/\s+/g, ' ').trim();
+    
+    // Strip long numeric sequences (like phone numbers) so they aren't matched as food items
+    const safeFoodText = cleanedTextForItems.replace(/(?:\d\s*){5,}/g, ' ');
+    
+    const itemRegex = /(\d+)\s+([a-zA-Z0-9\s\-]+?)(?=\s*(?:and|,|\.|\?|!|my name|name|enoda|per|peyar|peru|phone|number|mobile|mode|cash|upi|for|takeaway|dine-in|parcel|$))/gi;
     let mMatch;
-    while ((mMatch = itemRegex.exec(cleanedTextForItems)) !== null) {
+    while ((mMatch = itemRegex.exec(safeFoodText)) !== null) {
       const qty = parseInt(mMatch[1], 10);
       const rawName = mMatch[2].trim();
       if (rawName && !rawName.match(/^(my|name|phone|number|is|mode|cash|upi|order|please)$/i)) {
-        if (!itemsToAdd.some(i => i.name.toLowerCase() === rawName.toLowerCase())) {
+        if (!itemsToAdd.some(i => normalizeForDedup(i.name) === normalizeForDedup(rawName))) {
           itemsToAdd.push({ name: rawName, quantity: qty });
         }
       }
     }
 
+    const itemKeywords = {
+      'idli vada': 'idli vada',
+      'idly vada': 'idli vada',
+      'rava idli': 'rava idli',
+      'rava idly': 'rava idli',
+      'sambar idly': 'sambar idly',
+      'sambar idli': 'sambar idly',
+      'idli': 'idly',
+      'idly': 'idly',
+      'masala dosa': 'masala dosa',
+      'masala dosai': 'masala dosa',
+      // NOTE: Do NOT add generic 'dosa'/'dosai' here — it would override specific
+      // dosa names like 'kambu dosa', 'ghee dosa', 'podi dosa', etc.
+      // The item matching logic in findBestMenuItemMatch handles these correctly.
+      'onion uttapam': 'onion uttapam',
+      'onion uthappam': 'onion uttapam',
+      // NOTE: Do NOT add generic 'uttapam'/'uthappam' here — it overrides multi-word names
+      'poori sagu': 'poori sagu',
+      'pongal': 'pongal',
+      'butter naan': 'butter naan',
+      'naan': 'butter naan',
+      'roti': 'butter naan',
+      'schezwan noodles': 'schezwan noodles',
+      'noodles': 'schezwan noodles',
+      'noodle': 'schezwan noodles',
+      'veg. koftha': 'veg. koftha',
+      'veg kofta': 'veg. koftha',
+      'koftha': 'veg. koftha',
+      'kofta': 'veg. koftha',
+      'veg raitha': 'veg raitha',
+      'raitha': 'veg raitha',
+      'raita': 'veg raitha',
+      'cucumber salad': 'cucumber salad',
+      'salad': 'cucumber salad',
+      'parcel meal': 'parcel meal',
+      'meals': 'parcel meal',
+      'meal': 'parcel meal',
+      'coffee': 'coffee',
+      'tea': 'tea'
+    };
+
+    const keywordsList = Object.keys(itemKeywords).sort((a, b) => b.length - a.length);
+    keywordsList.forEach(keyword => {
+      const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(`(?:(\\d+)\\s+)?(?:plate\\s*s?\\s*of|portion\\s*s?\\s*of|order\\s*s?\\s*of|add|get|want|like\\s*to\\s*add|buy|bring)?\\s*\\b${escapedKeyword}\\b`, 'gi');
+      let match;
+      while ((match = pattern.exec(safeFoodText)) !== null) {
+        const qty = match[1] ? parseInt(match[1], 10) : 1;
+        const standardName = itemKeywords[keyword];
+        if (!itemsToAdd.some(i => normalizeForDedup(i.name) === normalizeForDedup(standardName))) {
+          itemsToAdd.push({ name: standardName, quantity: qty });
+        }
+      }
+    });
+
     if (itemsToAdd.length === 0 && menuItems && menuItems.length > 0) {
-      const cleanInput = cleanedTextForItems.replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, ' ').replace(/\s+/g, ' ');
+      const cleanInput = safeFoodText.replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, ' ').replace(/\s+/g, ' ');
       menuItems.forEach(item => {
         const cleanItemName = item.name.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, ' ').replace(/\s+/g, ' ');
-        if (cleanInput.includes(cleanItemName) && !itemsToAdd.some(i => i.name.toLowerCase() === item.name.toLowerCase())) {
+        if (cleanInput.includes(cleanItemName) && !itemsToAdd.some(i => normalizeForDedup(i.name) === normalizeForDedup(item.name))) {
           const itemMatchRegex = new RegExp(`(\\d+)\\s+${cleanItemName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
-          const qMatch = cleanedTextForItems.match(itemMatchRegex);
+          const qMatch = safeFoodText.match(itemMatchRegex);
           const extractedQty = qMatch ? parseInt(qMatch[1], 10) : 1;
           itemsToAdd.push({ name: item.name, quantity: extractedQty });
         }
@@ -629,7 +1193,11 @@ const AIAssistantOverlay = () => {
         let itemName = item.name.toLowerCase().trim();
         let quantity = item.quantity || 1;
 
-        itemName = itemName.replace(/\s+(each|per|portion|portions|plate|plates|piece|pieces|nos|no)$/i, '').trim();
+        let isPortion = false;
+        if (/\b(plate|plates|portion|portions)\b/i.test(itemName)) {
+          isPortion = true;
+        }
+        itemName = itemName.replace(/\b(each|per|portion|portions|plate|plates|piece|pieces|nos|no)\b/gi, '').trim();
 
         const words = itemName.split(/\s+/);
         const allNonFood = words.every(w => NON_FOOD_WORDS.has(w));
@@ -663,13 +1231,61 @@ const AIAssistantOverlay = () => {
           'kofthas': 'veg. koftha',
           'veg koftha': 'veg. koftha',
           'veg kofthas': 'veg. koftha',
-          'tomato raita': 'veg raitha',
-          'onion tomato raita': 'veg raitha',
-          'onion raita': 'veg raitha',
           'raita': 'veg raitha',
           'raitha': 'veg raitha',
           'veg raita': 'veg raitha',
           'veg raitha': 'veg raitha',
+          // Comprehensive Regional Aliases (Tanglish, Hinglish, Native)
+          // 1. Onion Uttapam
+          'onion uthappam': 'onion uttapam',
+          'onion utappam': 'onion uttapam',
+          'vengayam uthappam': 'onion uttapam',
+          'vengaya uthappam': 'onion uttapam',
+          'vengaya uttapam': 'onion uttapam',
+          'pyaaz uttapam': 'onion uttapam',
+          'pyaz uttapam': 'onion uttapam',
+          'oothappam': 'onion uttapam',
+          'uthappam': 'onion uttapam',
+          
+          // 2. Masala Dosa
+          'masala dosai': 'masala dosa',
+          'masal dosa': 'masala dosa',
+          'masal dosai': 'masala dosa',
+          'masala dose': 'masala dosa',
+          'aloo dosa': 'masala dosa',
+          'potato dosa': 'masala dosa',
+          
+          // 3. Idli Vada
+          'idly vada': 'idli vada',
+          'idly vadai': 'idli vada',
+          'idli vadai': 'idli vada',
+          'idly wada': 'idli vada',
+          'idli wada': 'idli vada',
+          'idly and vada': 'idli vada',
+          'idli and vadai': 'idli vada',
+          
+          // 4. Pongal
+          'ven pongal': 'pongal',
+          'venn pongal': 'pongal',
+          'ghee pongal': 'pongal',
+          'khara pongal': 'pongal',
+          
+          // 5. Poori Sagu
+          'puri sagu': 'poori sagu',
+          'poori saagu': 'poori sagu',
+          'puri saagu': 'poori sagu',
+          'poori masala': 'poori sagu',
+          'puri masala': 'poori sagu',
+          'poori kizhangu': 'poori sagu',
+          
+          // 6. Rava Idli
+          'rava idly': 'rava idli',
+          'ravva idli': 'rava idli',
+          'ravva idly': 'rava idli',
+          'sooji idli': 'rava idli',
+          'suji idli': 'rava idli',
+          
+          // Legacy mappings
           'non': 'butter naan',
           'nons': 'butter naan',
           'nan': 'butter naan',
@@ -689,7 +1305,7 @@ const AIAssistantOverlay = () => {
           'chai': 'tea',
           'sappathi': 'chappathi kuruma',
           'chappathi': 'chappathi kuruma',
-          'poori': 'poori masala',
+          'poori': 'poori sagu',
           'podi dosa': 'podi dosai',
           'session noodles': 'schezwan noodles',
           'session noodle': 'schezwan noodles',
@@ -731,8 +1347,16 @@ const AIAssistantOverlay = () => {
         const foundItem = findBestMenuItemMatch(itemName, menuItems);
 
         if (foundItem) {
-          addToCart(foundItem, quantity);
-          newlyAddedCartItems.push({ id: foundItem.id, name: foundItem.name, price: foundItem.price, quantity });
+          let finalQty = quantity;
+          const portionMatch = foundItem.name.match(/\((\d+)(?:\s*pcs?|\s*pieces?)?\)/i);
+          if (portionMatch && !isPortion) {
+            const portionSize = parseInt(portionMatch[1], 10);
+            if (portionSize > 1 && finalQty >= portionSize) {
+              finalQty = Math.ceil(finalQty / portionSize);
+            }
+          }
+          addToCart(foundItem, finalQty);
+          newlyAddedCartItems.push({ id: foundItem.id, name: foundItem.name, price: foundItem.price, quantity: finalQty });
           addedCount++;
         } else {
           console.warn(`Item not found in restaurant menu: ${item.name}`);
@@ -741,88 +1365,136 @@ const AIAssistantOverlay = () => {
       });
     }
 
+    let failedItemsWarning = "";
     if (itemsToAdd.length > 0 && failedItemNames.length > 0) {
-      const notClearSpeech = language === 'Tamil'
-        ? `மன்னிக்கவும், உங்களின் சில உணவுகள் (${failedItemNames.join(', ')}) தெளிவாக இல்லை. தயவுசெய்து மீண்டும் கூற முடியுமா?`
-        : `Sorry, I couldn't understand part of your order (${failedItemNames.join(', ')}). Could you please repeat that item clearly?`;
-      setMessages(prev => [...prev, { role: 'model', content: notClearSpeech }]);
-      speakText(notClearSpeech);
+      failedItemsWarning = language === 'Tamil'
+        ? `மன்னிக்கவும், உங்களின் சில உணவுகள் (${failedItemNames.join(', ')}) மெனுவில் இல்லை. `
+        : `Sorry, I couldn't understand part of your order (${failedItemNames.join(', ')}). `;
+      
+      const justProvidedDetails = text.match(/(?:my name is|i am|this is|name is|i just|just|myself|phone|mobile|number|cell|cash|upi|online|card|gpay|phonepe|paytm)/i);
+      if (addedCount === 0 && !justProvidedDetails) {
+        const notClearSpeech = failedItemsWarning + (language === 'Tamil'
+          ? `தயவுசெய்து மீண்டும் கூற முடியுமா?`
+          : `Could you please repeat that item clearly?`);
+        setMessages(prev => [...prev, { role: 'model', content: notClearSpeech }]);
+        speakText(notClearSpeech);
+        return { completed: true, handled: true };
+      }
+    }
+
+
+    // ─── HOME PAGE FLOW: Ask order type before adding items to cart ─────────────
+    const isOnHomePage = location.pathname === '/';
+    const NON_FOOD_WORDS_SET = new Set([
+      'session', 'sessions', 'something', 'items', 'item', 'food', 'dishes', 'dish',
+      'details', 'page', 'screen', 'checkout', 'payment', 'order', 'number',
+      'phone', 'name', 'mode', 'cash', 'upi', 'online', 'card', 'table',
+      'takeaway', 'dinein', 'parcel', 'please', 'help', 'view', 'navigate',
+      'yes', 'no', 'ok', 'okay', 'sure', 'go', 'to', 'for', 'my', 'is', 'the',
+      'each', 'per', 'portion', 'plate', 'piece', 'nos', 'done', 'more', 'dine', 'in', 'take', 'away'
+    ]);
+
+    if (isOnHomePage && addedCount > 0 && flowStage !== 'asked_order_type') {
+      if (currentOrderType) {
+        sessionStorage.setItem('chatbot_flow_stage', 'ordering');
+        const targetRoute = currentOrderType === 'takeaway' ? '/take-away' : '/dine-in';
+        const confirmSpeech = getDynamicResponse('menuNavigating', text)();
+        setMessages(prev => [...prev, { role: 'model', content: confirmSpeech }]);
+        speakText(confirmSpeech);
+        setTimeout(() => navigate(targetRoute), 800);
+        return { completed: true, handled: true };
+      }
+      // User mentioned food on home page — save items and ask Dine-In or Takeaway
+      const sourceItems = newlyAddedCartItems;
+      const pendingItems = sourceItems.map(i => ({ name: i.name, quantity: i.quantity || 1 }));
+      sessionStorage.setItem('chatbot_pending_items', JSON.stringify(pendingItems));
+      sessionStorage.setItem('chatbot_flow_stage', 'asked_order_type');
+      const itemDesc = pendingItems.map(i => `${i.quantity} ${i.name}`).join(', ');
+      const askOrderType = failedItemsWarning + getDynamicResponse('askDineInOrTakeawayHome', text)(itemDesc);
+      setMessages(prev => [...prev, { role: 'model', content: askOrderType }]);
+      speakText(askOrderType);
       return { completed: true, handled: true };
     }
 
-    let currentName = sessionStorage.getItem('customer_name') || '';
-
-    if (currentName.match(/\b(download|bill|invoice|mail|buddy|track|status|checkout|payment|home|cart|parcel)\b/i)) {
-      currentName = '';
-      sessionStorage.removeItem('customer_name');
-    }
-
-    const namePrefixMatch = text.match(/(?:my name is|i am|this is|name is|i just|just|myself)\s+([a-zA-Z\s]+?)(?=\s*(?:and|,|\.|phone|mobile|number|mode|cash|upi|$))/i);
-
-    if (namePrefixMatch) {
-      const extracted = namePrefixMatch[1].trim();
-      if (!extracted.match(/\b(download|bill|invoice|mail|buddy|track|status|checkout|payment|home|cart|parcel)\b/i)) {
-        currentName = extracted;
-      }
-    } else if (!currentName) {
-      const cleanWord = text.replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, '').trim();
-      const words = cleanWord.split(/\s+/);
-      const isFoodOrNav = words.some(w => {
-        const lw = w.toLowerCase();
-        return NON_FOOD_WORDS.has(lw) || (menuItems || []).some(m => m.name.toLowerCase().includes(lw));
-      });
-
-      if (!isFoodOrNav && words.length >= 1 && words.length <= 4 && cleanWord.length >= 2 && !cleanWord.match(/\d/) && !cleanWord.match(/\b(download|bill|invoice|mail|buddy|track|status|checkout|payment|home|cart|parcel)\b/i)) {
-        currentName = cleanWord;
-      }
-    }
-
-    if (currentName) {
-      // Clean conversational filler words (e.g. "akash actually" -> "akash")
-      currentName = currentName
-        .replace(/\b(actually|basically|please|bro|dude|sir|maam|here|only|no|yeah|its|it's|btw|by the way)\b/gi, '')
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (currentName && !currentName.match(/\b(download|bill|invoice|mail|buddy|track|status|checkout|payment|home|cart|parcel)\b/i)) {
-        sessionStorage.setItem('customer_name', currentName);
-        document.dispatchEvent(new CustomEvent('update-name', { detail: { name: currentName } }));
+    // ─── HOME PAGE: Handle order type response ──────────────────────────────────
+    if (flowStage === 'asked_order_type') {
+      const isDineIn = text.match(/\b(dine[\s-]*in|dinein|table|eat\s*here|eat\s*in|here|seating)\b/i);
+      const isTakeawayChoice = text.match(/\b(takeaway|take[\s-]*away|parcel|pack|to\s*go|carry\s*out)\b/i);
+      if (isDineIn || isTakeawayChoice) {
+        const chosenType = isTakeawayChoice ? 'takeaway' : 'dine_in';
+        sessionStorage.setItem('order_type', chosenType);
+        sessionStorage.setItem('chatbot_flow_stage', 'ordering');
+        sessionStorage.removeItem('chatbot_pending_items');
+        const targetRoute = chosenType === 'takeaway' ? '/take-away' : '/dine-in';
+        const confirmSpeech = chosenType === 'takeaway'
+          ? getDynamicResponse('takeawayNavigating', text)()
+          : getDynamicResponse('dineInNavigating', text)();
+        setMessages(prev => [...prev, { role: 'model', content: confirmSpeech }]);
+        speakText(confirmSpeech);
+        if (chosenType === 'dine_in') {
+          navigate('/dine-in');
+          setTimeout(() => document.dispatchEvent(new CustomEvent('open-qr-scanner')), 900);
+        } else {
+          setTimeout(() => navigate(targetRoute), 800);
+        }
+        return { completed: true, handled: true };
       } else {
-        currentName = '';
-        sessionStorage.removeItem('customer_name');
+        const reAsk = getDynamicResponse('sayDineInOrTakeaway', text)();
+        setMessages(prev => [...prev, { role: 'model', content: reAsk }]);
+        speakText(reAsk);
+        return { completed: true, handled: true };
       }
     }
 
-    let currentPhone = sessionStorage.getItem('customer_phone') || '';
-    const rawDigits = text.replace(/\D/g, '');
-    const phoneMatch = text.match(/(?:phone|mobile|number|cell)?\s*(?:is)?\s*(\d{10})/i);
-    if (phoneMatch) {
-      currentPhone = phoneMatch[1];
-      sessionStorage.setItem('customer_phone', currentPhone);
-      document.dispatchEvent(new CustomEvent('update-phone', { detail: { phone: currentPhone } }));
-    } else if (rawDigits.length >= 10) {
-      currentPhone = rawDigits.slice(-10);
-      sessionStorage.setItem('customer_phone', currentPhone);
-      document.dispatchEvent(new CustomEvent('update-phone', { detail: { phone: currentPhone } }));
-    }
+    // ─── MENU PAGE: Items added — ask 'order more?' ──────────────────────────────
+    const isOnMenuPage = location.pathname === '/dine-in' || location.pathname === '/take-away';
+    const isDoneOrdering = text.match(/\b(done|no more|that'?s all|thats all|finished|proceed|ready|complete|no|nope)\b/i) && !text.match(/\b(add|want|need|get|bring|\d+)\b/i);
 
-    let currentPayment = sessionStorage.getItem('payment_method') || '';
-    if (text.match(/\b(cash)\b/i)) {
-      currentPayment = 'Cash';
-      sessionStorage.setItem('payment_method', 'Cash');
-      document.dispatchEvent(new CustomEvent('select-payment', { detail: { method: 'Cash' } }));
-    } else if (text.match(/\b(upi|online|card|gpay|phonepe|paytm)\b/i)) {
-      currentPayment = 'UPI';
-      sessionStorage.setItem('payment_method', 'UPI');
-      document.dispatchEvent(new CustomEvent('select-payment', { detail: { method: 'UPI' } }));
-    }
-
-    let currentOrderType = sessionStorage.getItem('order_type') || '';
-    if (text.match(/\b(parcel|takeaway|take-away|pack|packing|packet|to go)\b/i)) {
-      currentOrderType = 'takeaway';
-      sessionStorage.setItem('order_type', 'takeaway');
-    } else if (text.match(/\b(dine-in|dine in|dinein|table|eat in|here|seating)\b/i)) {
-      currentOrderType = 'dine_in';
-      sessionStorage.setItem('order_type', 'dine_in');
+    if ((isOnMenuPage || location.pathname.includes('checkout') || location.pathname.includes('payment')) && itemsToAdd.length > 0 && !isDoneOrdering) {
+      // Add items then ask if they want more
+      let addedCount2 = 0; let failedItemNames2 = [];
+      if (lastAddedTurnIdRef.current !== currentTurnIdRef.current) {
+        lastAddedTurnIdRef.current = currentTurnIdRef.current;
+        const rmap = {
+          'non': 'butter naan', 'nan': 'butter naan', 'naan': 'butter naan', 'roti': 'butter naan',
+          'chai': 'tea', 'kaapi': 'coffee', 'chappathi': 'chappathi kuruma', 'poori': 'poori masala',
+          'session': 'schezwan noodles', 'papad': 'masala fry papad', 'appalam': 'masala fry papad'
+        };
+        itemsToAdd.forEach(item => {
+          let iName = (item.name || '').toLowerCase().trim();
+          let isPortion = false;
+          if (/\b(plate|plates|portion|portions)\b/i.test(iName)) isPortion = true;
+          iName = iName.replace(/\b(each|per|portion|portions|plate|plates|piece|pieces|nos|no)\b/gi, '').trim();
+          const words = iName.split(/\s+/);
+          if (words.every(w => NON_FOOD_WORDS_SET.has(w))) return;
+          if (rmap[iName]) iName = rmap[iName];
+          const found = findBestMenuItemMatch(iName, menuItems);
+          if (found) {
+            let finalQty = item.quantity || 1;
+            const portionMatch = found.name.match(/\((\d+)(?:\s*pcs?|\s*pieces?)?\)/i);
+            if (portionMatch && !isPortion) {
+              const portionSize = parseInt(portionMatch[1], 10);
+              if (portionSize > 1 && finalQty >= portionSize) {
+                finalQty = Math.ceil(finalQty / portionSize);
+              }
+            }
+            addToCart(found, finalQty); 
+            addedCount2++; 
+          }
+          else failedItemNames2.push(item.name);
+        });
+      }
+      if (failedItemNames2.length > 0 && addedCount2 === 0) {
+        const notClear = getDynamicResponse('itemsNotOnMenu', text)(failedItemNames2.join(', '));
+        setMessages(prev => [...prev, { role: 'model', content: notClear }]);
+        speakText(notClear);
+        return { completed: true, handled: true };
+      }
+      sessionStorage.setItem('chatbot_flow_stage', 'ordering');
+      const askMore = getDynamicResponse('itemsAddedAskMore', text)();
+      setMessages(prev => [...prev, { role: 'model', content: askMore }]);
+      speakText(askMore);
+      return { completed: true, handled: true };
     }
 
     // Synchronize newly added items with local cart state to prevent stale closure reads
@@ -845,7 +1517,7 @@ const AIAssistantOverlay = () => {
     }
 
     // 3. INTELLIGENT DECISION ENGINE & PROGRESSIVE STEP FLOW
-    const isConfirmationUtterance = text.match(/\b(confirm|yes|ok|okay|sure|place order|proceed|correct|yeah|ஆமாம்|உறுதி)\b/i);
+    const isConfirmationUtterance = text.match(/\b(confirm|yes|ok|okay|sure|place order|place my order|place it|proceed|correct|yeah|done|go ahead|do it|submit|that's correct|sounds good|looks good|order now|confirm it|confirm order|ஆமாம்|உறுதி)\b/i);
     const wantsToCheckout = text.match(/\b(checkout|pay|payment|bill|place order|confirm order|finish|i am done|im done|done)\b/i) || location.pathname.includes('checkout') || location.pathname.includes('payment');
     
     // Check if the user just provided details proactively in this utterance
@@ -854,9 +1526,7 @@ const AIAssistantOverlay = () => {
     if (activeCartItems.length > 0 || itemsToAdd.length > 0) {
       if (!currentOrderType) {
         if (location.pathname === '/') {
-          const promptSpeech = language === 'Tamil'
-            ? `நீங்கள் இங்கேயே சாப்பிட (Dine-in) விரும்புகிறீர்களா, அல்லது பார்சல் (Takeaway) வேண்டுமா?`
-            : `Would you like to order for Dine-in or Takeaway?`;
+          const promptSpeech = failedItemsWarning + getDynamicResponse('dineInOrTakeawayAsk', text)();
           setMessages(prev => [...prev, { role: 'model', content: promptSpeech }]);
           speakText(promptSpeech);
           return { handled: true };
@@ -870,7 +1540,7 @@ const AIAssistantOverlay = () => {
       // If we just got the order type on the home page, navigate and show the cart/menu!
       if (location.pathname === '/' && currentOrderType && !wantsToCheckout && !justProvidedDetails) {
          navigate(isTakeaway ? '/take-away' : '/dine-in');
-         const addedSpeech = language === 'Tamil' ? `உணவுகளை சேர்த்துள்ளேன். வேறு என்ன வேண்டும்?` : `I've added the items. What else would you like?`;
+         const addedSpeech = getDynamicResponse('itemsAddedWhatElse', text)();
          setMessages(prev => [...prev, { role: 'model', content: addedSpeech }]);
          speakText(addedSpeech);
          
@@ -884,7 +1554,7 @@ const AIAssistantOverlay = () => {
       // If they just added an item, but don't want to checkout yet, acknowledge it and let them browse.
       if (!wantsToCheckout && !justProvidedDetails && !isConfirmationUtterance) {
           if (newlyAddedCartItems.length > 0) {
-             const addedSpeech = language === 'Tamil' ? `உணவுகளை சேர்த்துள்ளேன். வேறு என்ன வேண்டும்?` : `I've added the items. What else would you like?`;
+             const addedSpeech = getDynamicResponse('itemsAddedWhatElse', text)();
              setMessages(prev => [...prev, { role: 'model', content: addedSpeech }]);
              speakText(addedSpeech);
              setIsCartOpen(true);
@@ -895,9 +1565,7 @@ const AIAssistantOverlay = () => {
 
       // STEP 1: Ask for Name if missing
       if (!currentName) {
-        const promptSpeech = language === 'Tamil'
-          ? `உங்களின் ஆர்டரைத் தொடர தயவுசெய்து உங்கள் பெயரை சொல்லவும்.`
-          : `To process your order, please tell me your full name.`;
+        const promptSpeech = failedItemsWarning + getDynamicResponse('askNamePrompt', text)();
         setMessages(prev => [...prev, { role: 'model', content: promptSpeech }]);
         speakText(promptSpeech);
         if (!location.pathname.includes('checkout') && !location.pathname.includes('payment')) {
@@ -908,9 +1576,7 @@ const AIAssistantOverlay = () => {
 
       // STEP 2: Ask for Phone Number if missing
       if (!currentPhone) {
-        const promptSpeech = language === 'Tamil'
-          ? `நன்றி ${currentName}! தயவுசெய்து உங்கள் 10-இலக்க தொலைபேசி எண்ணை சொல்லவும்.`
-          : `Thank you ${currentName}! Please tell me your 10-digit phone number.`;
+        const promptSpeech = failedItemsWarning + getDynamicResponse('askPhonePrompt', text)(currentName);
         setMessages(prev => [...prev, { role: 'model', content: promptSpeech }]);
         speakText(promptSpeech);
         if (!location.pathname.includes('checkout') && !location.pathname.includes('payment')) {
@@ -922,9 +1588,7 @@ const AIAssistantOverlay = () => {
       // STEP 3: Ask for Payment Method if missing
       if (!currentPayment) {
         const paymentRoute = isTakeaway ? '/takeaway-payment' : '/payment';
-        const promptSpeech = language === 'Tamil'
-          ? `நன்றி ${currentName}! உங்கள் ஆர்டருக்கு Cash mode அல்லது UPI mode எந்த முறையில் செலுத்த விரும்புகிறீர்கள்?`
-          : `Thank you ${currentName}! Would you like to pay using Cash mode or UPI mode?`;
+        const promptSpeech = failedItemsWarning + getDynamicResponse('askPaymentPrompt', text)(currentName);
         setMessages(prev => [...prev, { role: 'model', content: promptSpeech }]);
         speakText(promptSpeech);
         if (!location.pathname.includes('payment')) {
@@ -933,23 +1597,7 @@ const AIAssistantOverlay = () => {
         return { handled: true };
       }
 
-      // STEP 4: Name, Phone, and Payment Method are all present. CONFIRM ORDER SUMMARY FIRST!
-      const isAlreadyConfirmed = sessionStorage.getItem('order_pending_confirmation') === 'true' && isConfirmationUtterance;
-
-      if (!isAlreadyConfirmed) {
-        sessionStorage.setItem('order_pending_confirmation', 'true');
-        const sub = activeItemsToReport.reduce((sum, i) => sum + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
-        const confirmSpeech = language === 'Tamil'
-          ? `உங்கள் ஆர்டர்: ${itemSummary}. மொத்தம்: ₹${sub}. பெயர்: ${currentName}, தொலைபேசி எண்: ${currentPhone}, செலுத்தும் முறை: ${currentPayment}. இந்த ஆர்டரை உறுதி செய்து பெறவா?`
-          : `Here is your order: ${itemSummary} (Total: ₹${sub}). Customer: ${currentName}, Phone: ${currentPhone}, Mode: ${currentPayment}. Shall I confirm and place this order?`;
-
-        setMessages(prev => [...prev, { role: 'model', content: confirmSpeech }]);
-        speakText(confirmSpeech);
-        return { handled: true };
-      }
-
-      // STEP 5: CUSTOMER CONFIRMED ORDER -> SUBMIT TO BACKEND & NAVIGATE TO LIVE TRACKING!
-      sessionStorage.removeItem('order_pending_confirmation');
+      // STEP 4: Name, Phone, and Payment Method are all present. PLACE ORDER IMMEDIATELY!
       const targetTable = isTakeaway ? 'TakeAway' : (tableNumber || '06');
       const sub = activeItemsToReport.reduce((sum, i) => sum + (Number(i.price) || 0) * (Number(i.quantity) || 1), 0);
 
@@ -980,6 +1628,10 @@ const AIAssistantOverlay = () => {
         const generatedOrderId = resData.orderId || (dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`);
 
         sessionStorage.setItem('last_placed_order_id', generatedOrderId);
+        localStorage.setItem('active_order_id', generatedOrderId);
+        localStorage.setItem('active_order_type', isTakeaway ? 'takeaway' : 'dine-in');
+        localStorage.setItem('active_table_number', targetTable);
+
         clearAllCarts();
         sessionStorage.removeItem('customer_name');
         sessionStorage.removeItem('customer_phone');
@@ -990,9 +1642,7 @@ const AIAssistantOverlay = () => {
 
         const targetRoute = isTakeaway ? '/takeaway-order-success' : '/order-success';
 
-        const speechText = language === 'Tamil'
-          ? `நன்றி ${currentName}! உங்களின் ஆர்டர் (${generatedOrderId}) வெற்றிகரமாக பெறப்பட்டது. நேரடி டிராக்கிங் தொடங்குகிறது.`
-          : `Thank you ${currentName}! Your order (${generatedOrderId}) has been placed successfully via ${currentPayment} mode. Tracking your order now.`;
+        const speechText = getDynamicResponse('orderSuccessPrompt', text)(currentName, generatedOrderId, currentPayment);
 
         setMessages(prev => [...prev, { role: 'model', content: speechText }]);
         speakText(speechText);
@@ -1041,10 +1691,6 @@ const AIAssistantOverlay = () => {
       'veg koftas': 'veg. koftha',
       'koftha': 'veg. koftha',
       'kofthas': 'veg. koftha',
-      'tomato raita': 'veg raitha',
-      'onion tomato raita': 'veg raitha',
-      'onion raita': 'veg raitha',
-      'raita': 'veg raitha',
       '***** noodles': 'mushroom noodles',
       '***** noodle': 'mushroom noodles',
       'shroom noodles': 'mushroom noodles',
@@ -1134,8 +1780,24 @@ const AIAssistantOverlay = () => {
     setInputText('');
     setIsLoading(true);
 
+    if (sessionStorage.getItem('chatbot_flow_stage') === 'payment_done') {
+      const isAllowedPostPayment = normalizedText.match(/\b(track|tracking|order status|status|where is|check order|my order|my orders|what are my orders|what order|order details|call staff|call waiter|download|bill|invoice|receipt|print|mail|hi|hello|hey|thank you|thanks|ok|okay|cool|nice|good|sure|bye|goodbye|awesome|great|home|go home|home ku po|new order|start over|cancel order)\b/i);
+      const hasFoodIntent = normalizedText.match(/\b(add|order|want|get|buy|need|bring|pack|\d+)\b/i);
+      const isExplicitTracking = normalizedText.match(/\b(track|tracking|order status|status|where is|check order|my order|my orders|what are my orders|what order|order details|download|bill|invoice|receipt|print|mail|new order|start over|cancel order)\b/i);
+
+      if (!isAllowedPostPayment || (hasFoodIntent && !isExplicitTracking)) {
+        const lockedMsg = language === 'Tamil'
+          ? "உங்களுக்கு ஒரு ஆர்டர் ஏற்கனவே உள்ளது. புதிய ஆர்டர் செய்ய, இந்த ஆர்டர் முடியும் வரை காத்திருக்கவும்."
+          : "You currently have an active order. Please wait for it to be completed before placing a new order.";
+        setMessages(prev => [...prev, { role: 'model', content: lockedMsg }]);
+        speakText(lockedMsg);
+        setIsLoading(false);
+        return;
+      }
+    }
+
     // Try direct order execution or progressive order prompt first!
-    if (!audioBase64) {
+    if (!audioBase64 && sessionStorage.getItem('chatbot_flow_stage') !== 'payment_done') {
       const orderFlowResult = await executeDirectOrderOrPrompt(normalizedText);
       if (orderFlowResult.completed || orderFlowResult.handled) {
         setIsLoading(false);
@@ -1197,23 +1859,63 @@ const AIAssistantOverlay = () => {
 
     // --- LOCAL INTENT ENGINE: IS THIS NAVIGATION OR CATEGORY VIEW? ---
     if (!audioBase64) {
+      // 0.4 Dine In & Scan QR Intent
+      if (normalizedText.match(/\b(dine|dine\s*in|dine-in|scan\s*(the)?\s*qr|scan\s*qr|unnuthal|உண்ணுதல்)\b/i)) {
+        const speech = language === 'Tamil'
+          ? "நிச்சயமாக, டைன்-இன் மெனு திறக்கிறேன். உங்கள் மேஜையின் QR குறியீட்டை ஸ்கேன் செய்யவும் அல்லது மேஜை எண்ணை உள்ளிடவும்."
+          : "Sure! Taking you to Dine-In. Please scan your table QR code or enter the table number manually.";
+        setMessages(prev => [...prev, { role: 'model', content: speech }]);
+        speakText(speech);
+
+        sessionStorage.setItem('order_type', 'dine_in');
+
+        // Navigate to dine-in page, then open QR scanner modal there
+        const openScanner = () => {
+          document.dispatchEvent(new CustomEvent('open-qr-scanner'));
+        };
+
+        if (location.pathname === '/dine-in') {
+          // Already on dine-in page — just open the scanner
+          setTimeout(openScanner, 300);
+        } else {
+          // Navigate first, then open scanner after page loads
+          navigate('/dine-in');
+          setTimeout(openScanner, 900);
+        }
+
+        setIsLoading(false);
+        return;
+      }
+
       // 0.5 Live Order Tracking Intent
-      if (normalizedText.match(/\b(track|tracking|order status|status of order|where is my order|check order|order update|food status)\b/i)) {
+      if (normalizedText.match(/\b(track|tracking|order status|status of order|where is my order|check order|order update|food status|my order|my orders|what are my orders|what order|order details)\b/i)) {
         const lastOrderId = sessionStorage.getItem('last_placed_order_id');
+        if (!lastOrderId) {
+          const noOrderSpeech = getDynamicResponse('noOrderSpeech', normalizedText)();
+          setMessages(prev => [...prev, { role: 'model', content: noOrderSpeech }]);
+          speakText(noOrderSpeech);
+          setIsLoading(false);
+          return { completed: true, handled: true };
+        }
+
         const isTakeaway = location.pathname.includes('takeaway') || location.pathname.includes('take-away') || sessionStorage.getItem('order_type') === 'takeaway';
         const targetRoute = isTakeaway ? '/takeaway-order-success' : '/order-success';
 
-        let statusMsg = language === 'Tamil' ? "உங்களின் நேரடி ஆர்டர் டிராக்கிங் பக்கத்திற்கு செல்கிறோம்." : "Taking you to live order status tracking page.";
+        let statusMsg = getDynamicResponse('statusMsg', normalizedText)();
 
         if (lastOrderId) {
           try {
             const res = await fetch(`/api/orders/${lastOrderId}`);
             if (res.ok) {
               const data = await res.json();
-              const status = data.order?.status || 'CONFIRMED';
-              statusMsg = language === 'Tamil'
-                ? `உங்களின் ஆர்டர் (${lastOrderId}) நிலை: ${status}. நேரடி டிராக்கிங் பார்க்கிறீர்கள்.`
-                : `Your order (${lastOrderId}) status is: ${status}. Opening live tracking for you.`;
+              let status = data.order?.status || 'CONFIRMED';
+              
+              if (['SERVED', 'COMPLETED', 'CANCELLED'].includes(status.toUpperCase())) {
+                sessionStorage.removeItem('chatbot_flow_stage');
+              }
+              
+              if (status.toUpperCase() === 'PENDING') status = 'RECEIVED';
+              statusMsg = getDynamicResponse('statusMsgDetail', normalizedText)(lastOrderId, status);
             }
           } catch (e) { }
         }
@@ -1231,9 +1933,16 @@ const AIAssistantOverlay = () => {
 
       // 0.6 Bill Download / Invoice View Intent
       if (normalizedText.match(/\b(download\s*(my)?\s*bill|download\s*(my)?\s*invoice|get\s*(my)?\s*bill|get\s*(my)?\s*invoice|show\s*(my)?\s*bill|view\s*(my)?\s*bill|print\s*bill|mail\s*buddy|download\s*my\s*mail)\b/i)) {
-        const speech = language === 'Tamil'
-          ? "நிச்சயமாக! உங்களின் ரசீது பதிவிறக்கம் செய்யப்படுகிறது."
-          : "Sure! Downloading your bill now.";
+        const lastOrderId = sessionStorage.getItem('last_placed_order_id');
+        if (!lastOrderId) {
+          const noOrderSpeech = getDynamicResponse('noOrderSpeech', normalizedText)();
+          setMessages(prev => [...prev, { role: 'model', content: noOrderSpeech }]);
+          speakText(noOrderSpeech);
+          setIsLoading(false);
+          return { completed: true, handled: true };
+        }
+
+        const speech = getDynamicResponse('downloadBillSpeech', normalizedText)();
 
         setMessages(prev => [...prev, { role: 'model', content: speech }]);
         speakText(speech);
@@ -1253,7 +1962,7 @@ const AIAssistantOverlay = () => {
       // 1. Cart Navigation
       if (normalizedText.match(/(open|view|show|go to)\s*(cart|basket)/i) || normalizedText.includes('கார்ட்டைக் காட்டு')) {
         setIsCartOpen(true);
-        const msg = language === 'Tamil' ? "நிச்சயமாக, இதோ உங்கள் கார்ட்." : "Sure, here is your cart.";
+        const msg = getDynamicResponse('hereIsCart', normalizedText)();
         setMessages(prev => [...prev, { role: 'model', content: msg }]);
         speakText(msg);
         setIsLoading(false);
@@ -1261,7 +1970,7 @@ const AIAssistantOverlay = () => {
       }
       if (normalizedText.match(/(close|hide)\s*(cart|basket)/i) || normalizedText.includes('கார்ட்டை மறை')) {
         setIsCartOpen(false);
-        const msg = language === 'Tamil' ? "கார்ட் மூடப்பட்டது." : "Okay, I've hidden the cart.";
+        const msg = getDynamicResponse('cartClosed', normalizedText)();
         setMessages(prev => [...prev, { role: 'model', content: msg }]);
         speakText(msg);
         setIsLoading(false);
@@ -1282,23 +1991,23 @@ const AIAssistantOverlay = () => {
       // Linear Step-by-Step Back Navigation Rule
       if (normalizedText.match(/\b(go\s*back|back|previous\s*page|previous\s*screen|back\s*page|take\s*me\s*back)\b/i)) {
         let targetRoute = '/';
-        let msg = language === 'Tamil' ? "முந்தைய பக்கத்திற்கு செல்கிறோம்." : "Going to previous page.";
+        let msg = getDynamicResponse('goBackPrompt', normalizedText)();
 
         if (location.pathname.includes('invoice')) {
           targetRoute = location.pathname.includes('takeaway') ? '/takeaway-order-success' : '/order-success';
-          msg = language === 'Tamil' ? "ஆர்டர் நிலை பக்கத்திற்கு செல்கிறோம்." : "Returning to Order Status page.";
+          msg = getDynamicResponse('goBackInvoicePrompt', normalizedText)();
         } else if (location.pathname.includes('order-success')) {
           targetRoute = location.pathname.includes('takeaway') ? '/takeaway-payment' : '/payment';
-          msg = language === 'Tamil' ? "கட்டண பக்கத்திற்கு செல்கிறோம்." : "Returning to Payment page.";
+          msg = getDynamicResponse('goBackPaymentPrompt', normalizedText)();
         } else if (location.pathname.includes('payment')) {
           targetRoute = location.pathname.includes('takeaway') ? '/takeaway-checkout' : '/checkout';
-          msg = language === 'Tamil' ? "செக்அவுட் பக்கத்திற்கு செல்கிறோம்." : "Returning to Checkout page.";
+          msg = getDynamicResponse('goBackCheckoutPrompt', normalizedText)();
         } else if (location.pathname.includes('checkout')) {
           targetRoute = location.pathname.includes('takeaway') ? '/take-away' : '/dine-in';
-          msg = language === 'Tamil' ? "மெனு பக்கத்திற்கு செல்கிறோம்." : "Returning to Menu page.";
+          msg = getDynamicResponse('goBackMenuPrompt', normalizedText)();
         } else if (location.pathname.includes('dine-in') || location.pathname.includes('take-away') || location.pathname.includes('takeaway')) {
           targetRoute = '/';
-          msg = language === 'Tamil' ? "முகப்பு பக்கத்திற்கு செல்கிறோம்." : "Returning to Home page.";
+          msg = getDynamicResponse('goingHome', normalizedText)();
         }
 
         setMessages(prev => [...prev, { role: 'model', content: msg }]);
@@ -1315,7 +2024,7 @@ const AIAssistantOverlay = () => {
         (normalizedText.length <= 12 && normalizedText.match(/\b(home|முகப்பு|வீடு|घर)\b/i))
       );
       if (isHomeMatch) {
-        const msg = language === 'Tamil' ? "முகப்பு பக்கத்திற்கு செல்கிறோம்." : "Going to home page.";
+        const msg = getDynamicResponse('goingHome', normalizedText)();
         setMessages(prev => [...prev, { role: 'model', content: msg }]);
         speakText(msg);
         setTimeout(() => { setIsOpen(false); navigate('/'); }, 500);
@@ -1324,7 +2033,7 @@ const AIAssistantOverlay = () => {
       }
       if (normalizedText.match(/new\s*order|start\s*over|cancel\s*order/i)) {
         clearCart();
-        const msg = language === 'Tamil' ? "புதிய ஆர்டரைத் தொடங்குகிறோம்." : "Starting a new order.";
+        const msg = getDynamicResponse('startingNewOrder', normalizedText)();
         setMessages(prev => [...prev, { role: 'model', content: msg }]);
         speakText(msg);
         setTimeout(() => {
@@ -1338,7 +2047,7 @@ const AIAssistantOverlay = () => {
       // 2. Checkout Navigation
       if (normalizedText.match(/(checkout|pay|payment|bill|place order|confirm order)/i) && !normalizedText.match(/(add|remove|download)/i)) {
         if (cart.length === 0) {
-          const msg = language === 'Tamil' ? "Unga cart empty ah irukku. Thayavu seithu mudhalil order seiyavum." : "Your cart is empty. Please add items to your order first.";
+          const msg = getDynamicResponse('cartEmpty', normalizedText)();
           setMessages(prev => [...prev, { role: 'model', content: msg }]);
           speakText(msg);
           setIsLoading(false);
@@ -1350,7 +2059,7 @@ const AIAssistantOverlay = () => {
 
         if (location.pathname.includes('payment')) {
           if (normalizedText.match(/(go to payment|navigate to payment)/i)) {
-            const msg = language === 'Tamil' ? "Neengal yerkkanave payment pakkathil ulleergal." : "You are already on the payment page.";
+            const msg = getDynamicResponse('alreadyOnPayment', normalizedText)();
             setMessages(prev => [...prev, { role: 'model', content: msg }]);
             speakText(msg);
             setIsLoading(false);
@@ -1365,7 +2074,7 @@ const AIAssistantOverlay = () => {
               document.dispatchEvent(new CustomEvent('select-payment', { detail: { method } }));
             }
 
-            const msg = language === 'Tamil' ? "Order seiyappadugirathu." : "Placing your order.";
+            const msg = getDynamicResponse('placingOrder', normalizedText)();
             setMessages(prev => [...prev, { role: 'model', content: msg }]);
             speakText(msg);
             setTimeout(() => {
@@ -1381,14 +2090,14 @@ const AIAssistantOverlay = () => {
           const phoneInput = document.querySelector('input[name="phone"]');
 
           if (nameInput && phoneInput && (!nameInput.value.trim() || !/^\d{10}$/.test(phoneInput.value.replace(/\D/g, '')))) {
-            const msg = language === 'Tamil' ? "Thayavu seithu ungal peyar matrum 10-digit phone number-ai mudhalil kooravum." : "Please tell me your valid name and 10-digit phone number first.";
+            const msg = getDynamicResponse('enterNameAndPhonePrompt', normalizedText)();
             setMessages(prev => [...prev, { role: 'model', content: msg }]);
             speakText(msg);
             setIsLoading(false);
             return;
           }
 
-          const msg = language === 'Tamil' ? "Payment pakkathirku selgirom." : "Proceeding to payment.";
+          const msg = getDynamicResponse('proceedingToPayment', normalizedText)();
           setMessages(prev => [...prev, { role: 'model', content: msg }]);
           speakText(msg);
           setTimeout(() => {
@@ -1398,7 +2107,7 @@ const AIAssistantOverlay = () => {
           return;
         }
 
-        const msg = language === 'Tamil' ? "Mudhalil checkout seiyavum." : "Taking you to checkout first.";
+        const msg = getDynamicResponse('takingToCheckout', normalizedText)();
         setMessages(prev => [...prev, { role: 'model', content: msg }]);
         speakText(msg);
         setTimeout(() => {
@@ -1414,15 +2123,13 @@ const AIAssistantOverlay = () => {
         const hasBeenGreeted = sessionStorage.getItem('customer_has_been_greeted') === 'true';
         if (!hasBeenGreeted) {
           sessionStorage.setItem('customer_has_been_greeted', 'true');
-          const greetMsg = language === 'Tamil'
-            ? "வணக்கம்! டேட்டா உடுப்பி உணவகத்திற்கு வரவேற்கிறோம். இன்று உங்களுக்கு என்ன உணவுகள் வேண்டும்?"
-            : "Hello! Welcome to Data Udupi Restaurant. What would you like to order today?";
+          const greetMsg = getDynamicResponse('greetingMessage', normalizedText)();
           setMessages(prev => [...prev, { role: 'model', content: greetMsg }]);
           speakText(greetMsg);
           setIsLoading(false);
           return;
         } else {
-          const promptMsg = language === 'Tamil' ? "சொல்லுங்கள், வேறு என்ன வேண்டும்?" : "Yes! How else can I help with your order?";
+          const promptMsg = getDynamicResponse('promptMsg', normalizedText)();
           setMessages(prev => [...prev, { role: 'model', content: promptMsg }]);
           speakText(promptMsg);
           setIsLoading(false);
@@ -1435,7 +2142,7 @@ const AIAssistantOverlay = () => {
 
       if (isMenuQuery) {
         if (language !== 'Tamil') setLanguage('Tamil');
-        const overviewSpeech = "Namma menu-la Dosa, Idly, Schezwan Noodles, Veg. Koftha, Masala Dosa, Curd Rice, Beverages ellam irukku! Ungalukku enna venum?";
+        const overviewSpeech = getDynamicResponse('overviewSpeech', normalizedText)();
 
         setMessages(prev => [...prev, { role: 'model', content: overviewSpeech }]);
         speakText(overviewSpeech);
@@ -1460,10 +2167,11 @@ const AIAssistantOverlay = () => {
         const catOverviewList = itemsInCat.length > 0 ? itemsInCat.slice(0, 5).map(i => i.name).join(', ') : '';
 
         let msg = '';
-        if (language === 'Tamil') {
+        const userLang = detectUserLanguage(normalizedText);
+        if (userLang === 'Tamil' || userLang === 'Tanglish' || userLang === 'Hindi' || userLang === 'Hinglish') {
           msg = catOverviewList
-            ? `${catMatch.name} பிரிவில் ${catOverviewList} உள்ளன. இதில் ஏதேனும் சேர்க்க விரும்புகிறீர்களா?`
-            : `${catMatch.name} வகைகளை காண்பிக்கிறேன். உங்களின் தேர்வை கூறவும்.`;
+            ? getDynamicResponse('catOverviewListTamil', normalizedText)(catMatch.name, catOverviewList)
+            : getDynamicResponse('catOverviewListOnly', normalizedText)(catMatch.name);
         } else {
           msg = catOverviewList
             ? `Under ${catMatch.name}, we have ${catOverviewList}. Would you like to add any of these to your order?`
@@ -1495,14 +2203,14 @@ const AIAssistantOverlay = () => {
 
         if (location.pathname.includes('payment') && (method === 'UPI' || normalizedText.match(/(ok|place|confirm|done)/i))) {
           // Auto confirm for online payment or if they said ok
-          const confirmMsg = language === 'Tamil' ? "Order seiyappadugirathu." : "Placing your order.";
+          const confirmMsg = getDynamicResponse('placingOrderPrompt', normalizedText)();
           setMessages(prev => [...prev, { role: 'model', content: confirmMsg }]);
           speakText(confirmMsg);
           setTimeout(() => {
             document.dispatchEvent(new CustomEvent('confirm-place-order', { detail: { method } }));
           }, 1000);
         } else {
-          const confirmMsg = language === 'Tamil' ? `${method} thernthedukkappattathu. Thayavu seithu 'Place order' endru kooravum.` : `Selected ${method}. Say 'Place order' to confirm.`;
+          const confirmMsg = getDynamicResponse('selectPaymentPrompt', normalizedText)(method);
           setMessages(prev => [...prev, { role: 'model', content: confirmMsg }]);
           speakText(confirmMsg);
         }
@@ -1623,7 +2331,7 @@ const AIAssistantOverlay = () => {
               aiResponse = { speech: rawResponse, action: null };
             } else {
               aiResponse = {
-                speech: language === 'Tamil' ? "Mannikkavum, enakku sariyaga puriyavillai. Meendum koora mudiyuma?" : "Sorry, I missed that. Could you please repeat?",
+                speech: detectUserLanguage(normalizedText) === 'Tamil' || detectUserLanguage(normalizedText) === 'Tanglish' ? "Mannikkavum, enakku sariyaga puriyavillai. Meendum koora mudiyuma?" : "Sorry, I missed that. Could you please repeat?",
                 action: null
               };
             }
@@ -1640,31 +2348,31 @@ const AIAssistantOverlay = () => {
           if (trCatMatch && !trLower.match(/(cart|basket|order|add|pay|checkout|buy)/i)) {
             setActiveCategory(trCatMatch.id);
             if (!location.pathname.includes('dine-in') && !location.pathname.includes('take-away')) navigate('/dine-in');
-            botText = language === 'Tamil' ? `${trCatMatch.name} வகைகளை காண்பிக்கிறேன்.` : `Showing ${trCatMatch.name} items.`;
+            botText = getDynamicResponse('showingCategory', trLower)(trCatMatch.name);
             aiResponse.intent = false; // Prevent Gemini action fallback
           }
 
           if (trLower.match(/(open|view|show|go to)\s*(cart|basket)/i) || trLower.includes('கார்ட்டைக் காட்டு')) {
-            setIsCartOpen(true); botText = language === 'Tamil' ? "நிச்சயமாக, இதோ உங்கள் கார்ட்." : "Sure, here is your cart.";
+            setIsCartOpen(true); botText = getDynamicResponse('hereIsCart', trLower)();
           } else if (trLower.match(/(close|hide)\s*(cart|basket)/i) || trLower.includes('கார்ட்டை மறை')) {
-            setIsCartOpen(false); botText = language === 'Tamil' ? "கார்ட் மூடப்பட்டது." : "Okay, I've hidden the cart.";
+            setIsCartOpen(false); botText = getDynamicResponse('cartClosed', trLower)();
           } else if (trLower.match(/scroll\s*down|go\s*down|page\s*down/i)) {
-            window.scrollBy({ top: window.innerHeight * 0.6, behavior: 'smooth' }); botText = "Scrolling down.";
+            window.scrollBy({ top: window.innerHeight * 0.6, behavior: 'smooth' }); botText = getDynamicResponse('scrollingDownPrompt', trLower)();
           } else if (trLower.match(/scroll\s*up|go\s*up|page\s*up/i)) {
-            window.scrollBy({ top: -window.innerHeight * 0.6, behavior: 'smooth' }); botText = "Scrolling up.";
+            window.scrollBy({ top: -window.innerHeight * 0.6, behavior: 'smooth' }); botText = getDynamicResponse('scrollingUpPrompt', trLower)();
           } else if (trLower.match(/go\s*home|home\s*page|home\s*ku\s*po|home\s*ponga|முகப்பு|ஹோம்/i)) {
-            setTimeout(() => { setIsOpen(false); navigate('/'); }, 1000); botText = language === 'Tamil' ? "முகப்பு பக்கத்திற்குச் செல்கிறோம்." : "Going home.";
+            setTimeout(() => { setIsOpen(false); navigate('/'); }, 1000); botText = getDynamicResponse('goingHome', trLower)();
           } else if (trLower.match(/new\s*order|start\s*over|cancel\s*order/i)) {
-            clearCart(); setTimeout(() => { setIsOpen(false); navigate('/dine-in'); }, 1000); botText = "Starting new order.";
+            clearCart(); setTimeout(() => { setIsOpen(false); navigate('/dine-in'); }, 1000); botText = getDynamicResponse('startingNewOrder', trLower)();
           } else if (trLower.match(/(checkout|pay|payment|bill|place order|confirm order)/i) && !trLower.match(/(add|remove|download)/i)) {
             if (cart.length === 0) {
-              botText = language === 'Tamil' ? "Unga cart empty ah irukku. Thayavu seithu mudhalil order seiyavum." : "Your cart is empty. Please add items to your order first.";
+              botText = getDynamicResponse('cartEmpty', trLower)();
             } else {
               setIsCartOpen(false);
               setIsOpen(false);
               if (location.pathname.includes('payment')) {
                 if (trLower.match(/(go to payment|navigate to payment)/i)) {
-                  botText = language === 'Tamil' ? "Neengal yerkkanave payment pakkathil ulleergal." : "You are already on the payment page.";
+                  botText = getDynamicResponse('alreadyOnPayment', trLower)();
                 } else if (trLower.match(/(place order|confirm order|pay|ok|done|cash|upi|online|card|paytm|gpay|phonepe)/i)) {
                   const isPaymentMethod = trLower.match(/(cash|upi|online|card|paytm|gpay|phonepe)/i);
                   let method;
@@ -1672,14 +2380,14 @@ const AIAssistantOverlay = () => {
                     method = trLower.match(/(cash)/i) ? 'Cash' : 'UPI';
                     document.dispatchEvent(new CustomEvent('select-payment', { detail: { method } }));
                   }
-                  botText = language === 'Tamil' ? "Order seiyappadugirathu." : "Placing your order.";
+                  botText = getDynamicResponse('placingOrder', trLower)();
                   setTimeout(() => { document.dispatchEvent(new CustomEvent('confirm-place-order', { detail: { method } })); }, 1000);
                 }
               } else if (location.pathname.includes('checkout')) {
-                botText = language === 'Tamil' ? "Payment pakkathirku selgirom." : "Proceeding to payment.";
+                botText = getDynamicResponse('proceedingToPayment', trLower)();
                 setTimeout(() => { document.dispatchEvent(new CustomEvent('continue-to-payment')); }, 1000);
               } else {
-                botText = language === 'Tamil' ? "Mudhalil checkout seiyavum." : "Taking you to checkout first.";
+                botText = getDynamicResponse('takingToCheckout', trLower)();
                 setTimeout(() => { navigate(location.pathname.includes('takeaway') || location.pathname.includes('take-away') ? '/takeaway-checkout' : '/checkout'); }, 1000);
               }
             }
@@ -1701,6 +2409,7 @@ const AIAssistantOverlay = () => {
 
           const nameToUpdate = params.fullName || params.customerName || (action === 'UPDATE_NAME' ? params.name : null);
           if (nameToUpdate) {
+            sessionStorage.setItem('customer_name', nameToUpdate);
             document.dispatchEvent(new CustomEvent('update-name', { detail: { name: nameToUpdate } }));
             updatedName = true;
           }
@@ -1709,6 +2418,7 @@ const AIAssistantOverlay = () => {
           if (phoneToUpdate) {
             const cleanedPhone = String(phoneToUpdate).replace(/\D/g, '');
             if (/^\d{10}$/.test(cleanedPhone)) {
+              sessionStorage.setItem('customer_phone', cleanedPhone);
               document.dispatchEvent(new CustomEvent('update-phone', { detail: { phone: cleanedPhone } }));
               updatedPhone = true;
             } else if (action === 'UPDATE_PHONE') {
@@ -1717,6 +2427,9 @@ const AIAssistantOverlay = () => {
           }
 
           if (action === 'ADD_ITEM' && params.name) {
+            if (sessionStorage.getItem('chatbot_flow_stage') === 'payment_done') {
+              return language === 'Tamil' ? "உங்களுக்கு ஒரு ஆர்டர் ஏற்கனவே உள்ளது. புதிய ஆர்டர் செய்ய காத்திருக்கவும்." : "You currently have an active order. Please wait for it to be completed before placing a new order.";
+            }
             let itemName = String(params.name).toLowerCase().trim();
             let quantity = 1;
 
@@ -1834,8 +2547,17 @@ const AIAssistantOverlay = () => {
             } else {
               return language === 'Tamil' ? `Ungal cart-il ${params.name} illai.` : `${params.name} is not in your cart.`;
             }
-          } else if (action === 'CLEAR_CART') {
+          } else if (action === 'CLEAR_CART' || action === 'CANCEL_ORDER' || action === 'RESET_ORDER') {
+            clearAllCarts();
             clearCart();
+            sessionStorage.removeItem('customer_name');
+            sessionStorage.removeItem('customer_phone');
+            sessionStorage.removeItem('payment_method');
+            sessionStorage.removeItem('order_type');
+            sessionStorage.removeItem('chatbot_flow_stage');
+            sessionStorage.removeItem('chatbot_pending_items');
+            setTimeout(() => { setIsOpen(false); navigate('/'); }, 1000);
+            return language === 'Tamil' ? "உங்கள் ஆர்டர் ரத்து செய்யப்பட்டது. கார்ட் காலியாக உள்ளது." : "Your order has been cancelled and the cart is cleared.";
           } else if (action === 'UPDATE_QUANTITY' && params.name) {
             const itemName = params.name.toLowerCase();
             const foundItem = cart.find(i => i.name.toLowerCase().includes(itemName));
@@ -1916,6 +2638,7 @@ const AIAssistantOverlay = () => {
               document.dispatchEvent(new CustomEvent('download-invoice'));
             }, 2000);
           } else if (action === 'PAYMENT_METHOD' && params.method) {
+            sessionStorage.setItem('payment_method', params.method);
             document.dispatchEvent(new CustomEvent('select-payment', { detail: { method: params.method } }));
           } else if (action === 'UPDATE_NAME' || action === 'UPDATE_PHONE') {
             // Already handled at the start of executeAction
@@ -1926,11 +2649,14 @@ const AIAssistantOverlay = () => {
             const scrollContainer = document.querySelector('.di-grid') || document.querySelector('.checkout-container') || document.querySelector('.main-content') || window;
             scrollContainer.scrollBy({ top: -window.innerHeight * 0.6, behavior: 'smooth' });
           } else if (action === 'NEW_ORDER') {
+            clearAllCarts();
             clearCart();
-            setIsOpen(false);
-            navigate(location.pathname.includes('takeaway') || location.pathname.includes('take-away') ? '/take-away' : '/dine-in');
-          } else if (action === 'NEW_ORDER') {
-            clearCart();
+            sessionStorage.removeItem('customer_name');
+            sessionStorage.removeItem('customer_phone');
+            sessionStorage.removeItem('payment_method');
+            sessionStorage.removeItem('order_type');
+            sessionStorage.removeItem('chatbot_flow_stage');
+            sessionStorage.removeItem('chatbot_pending_items');
             setIsOpen(false);
             navigate(location.pathname.includes('takeaway') || location.pathname.includes('take-away') ? '/take-away' : '/dine-in');
           } else if (action === 'GO_HOME' || action === 'OPEN_HOME' || action === 'NAVIGATE_HOME' || action === 'GO_TO_HOME' || action === 'HOME' || action === 'CLICK_HOME') {
@@ -2051,10 +2777,14 @@ const AIAssistantOverlay = () => {
     </div>
   );
 
+  if (activeOrderId) {
+    return null;
+  }
+
   return (
     <>
-      {/* Fixed Trigger Button */}
-      {!isOpen && (
+      {/* Fixed Trigger Button — hidden on order-success pages after payment */}
+      {!isOpen && !location.pathname.includes('order-success') && (
         <div
           className={`ai-trigger-btn ${isListening ? 'is-listening' : ''}`}
           onClick={toggleSidebar}

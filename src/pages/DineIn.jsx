@@ -269,6 +269,33 @@ export default function DineIn() {
   }
 
   useEffect(() => {
+    const handleOpenScanner = () => {
+      setShowScanner(true);
+      setScannerError('');
+      setManualTable('');
+    };
+    const handleCloseScannerEvent = () => {
+      handleCloseScanner();
+    };
+    const handleSimulateScan = (e) => {
+      const tableNum = e.detail?.tableNumber || '06';
+      setTableNumber(tableNum);
+      localStorage.setItem('active_table_number', tableNum);
+      handleCloseScanner();
+    };
+    
+    document.addEventListener('open-qr-scanner', handleOpenScanner);
+    document.addEventListener('close-qr-scanner', handleCloseScannerEvent);
+    document.addEventListener('simulate-scan-success', handleSimulateScan);
+    
+    return () => {
+      document.removeEventListener('open-qr-scanner', handleOpenScanner);
+      document.removeEventListener('close-qr-scanner', handleCloseScannerEvent);
+      document.removeEventListener('simulate-scan-success', handleSimulateScan);
+    };
+  }, [setTableNumber]);
+
+  useEffect(() => {
     let active = true
     let html5QrCode = null
 

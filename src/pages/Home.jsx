@@ -175,11 +175,11 @@ function Home() {
     if (showScanner) {
       const timer = setTimeout(() => {
         if (!active) return
-        
+
         try {
           html5QrCode = new Html5Qrcode("qr-reader")
           qrCodeInstanceRef.current = html5QrCode
-          
+
           html5QrCode.start(
             { facingMode: "environment" },
             {
@@ -191,7 +191,7 @@ function Home() {
                 handleScanSuccess(decodedText)
               }
             },
-            () => {}
+            () => { }
           ).then(() => {
             // If the cleanup happened while start() was pending
             if (!active && html5QrCode) {
@@ -243,7 +243,7 @@ function Home() {
     <div className="app-container home-page-container">
       <div className="background-image"></div>
       <Header tableNumber={tableNumber} showFullHeader={true} useTitleImage={false} showDateTime={false} hideTableIndicator={true} />
-      
+
       <main className="main-content">
         <h2 className="welcome-text">{t('welcome')}</h2>
         <div className="main-title">
@@ -294,10 +294,10 @@ function Home() {
               <h5 className="manual-card-title">Unable to scan?</h5>
               <p className="manual-card-subtitle">Enter the table number manually from your table card</p>
               <div className="manual-input-group">
-                <input 
-                  type="text" 
-                  className="manual-table-input" 
-                  placeholder="Table No. (e.g. 05)" 
+                <input
+                  type="text"
+                  className="manual-table-input"
+                  placeholder="Table No. (e.g. 05)"
                   value={manualTable}
                   onChange={(e) => setManualTable(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}

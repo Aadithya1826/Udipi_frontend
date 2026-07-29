@@ -26,40 +26,54 @@ const TakeAwayOrderSuccess = () => {
   const [trackStep, setTrackStep] = useState(1); // 1: Received, 2: Preparing, 3: Ready for Pickup, 4: Completed
   const [isFinalScreen, setIsFinalScreen] = useState(false);
   const [dbStatus, setDbStatus] = useState(null);
+  const [fetchedOrder, setFetchedOrder] = useState(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
-  // Clear cart on mount
+  // Clear cart & lock back navigation on mount
   useEffect(() => {
     clearCart();
+    sessionStorage.setItem('chatbot_flow_stage', 'payment_done');
     if (autoTrack) setIsTrackMode(true);
     const handleTrackEvent = () => setIsTrackMode(true);
     document.addEventListener('track-order-mode', handleTrackEvent);
-    return () => document.removeEventListener('track-order-mode', handleTrackEvent);
+
+    // Lock browser back button so user stays on order status page
+    window.history.pushState(null, '', window.location.href);
+    const handlePopState = () => {
+      window.history.pushState(null, '', window.location.href);
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      document.removeEventListener('track-order-mode', handleTrackEvent);
+      window.removeEventListener('popstate', handlePopState);
+    };
   }, [autoTrack]);
 
   // Transition to final thank you screen after being completed
-  // Transition to final thank you screen immediately after being completed
   useEffect(() => {
     if (trackStep === 4) {
       setIsFinalScreen(true);
     }
   }, [trackStep]);
 
-  // Stay on this final screen indefinitely until the user manually navigates away
+  const localActiveId = localStorage.getItem('active_order_id');
+  const lastSessionId = sessionStorage.getItem('last_placed_order_id');
+  const activeOrderId = dbOrderId || localActiveId || lastSessionId;
+
+  // Save active order id to session storage to prevent dummy order on refresh/back
   useEffect(() => {
-    if (isFinalScreen) {
-      // Auto-navigation removed
+    if (activeOrderId) {
+      sessionStorage.setItem('last_placed_order_id', activeOrderId);
     }
-  }, [isFinalScreen]);
+  }, [activeOrderId]);
 
   // Poll real-time order status from backend
   useEffect(() => {
-    if (!isTrackMode) return;
+    if (!activeOrderId) return;
 
     let isMounted = true;
-    const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
-    const activeOrderId = dbOrderId || orderId;
 
     const checkStatus = async () => {
       try {
@@ -67,10 +81,13 @@ const TakeAwayOrderSuccess = () => {
         if (!res.ok) return;
         const data = await res.json();
         if (isMounted) {
-          setDbStatus(data.order?.status || data.status); // PENDING, CONFIRMED, PREPARING, READY, SERVED, CANCELLED
+          setDbStatus(data.order?.status || data.status);
+          if (data.order && data.items) {
+            setFetchedOrder(data);
+          }
         }
       } catch (err) {
-        console.warn("Could not fetch order status from server, using simulation:", err);
+        console.warn("Could not fetch order status from server:", err);
       }
     };
 
@@ -81,7 +98,7 @@ const TakeAwayOrderSuccess = () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [isTrackMode, dbOrderId]);
+  }, [isTrackMode, activeOrderId]);
 
   // Map database status to corresponding stepper timeline index
   useEffect(() => {
@@ -102,16 +119,16 @@ const TakeAwayOrderSuccess = () => {
     if (dbStatus === 'SERVED' || dbStatus === 'COMPLETED' || dbStatus === 'CANCELLED') {
       localStorage.removeItem('active_order_id');
       localStorage.removeItem('active_order_type');
+      sessionStorage.removeItem('ai_has_greeted');
+      sessionStorage.removeItem('chatbot_flow_stage');
+      sessionStorage.removeItem('last_placed_order_id');
     }
   }, [dbStatus]);
-
-  // Order status is controlled strictly by real DB updates from backend/admin side
-  // Default to step 1 (Order Received) until dbStatus changes
 
   // Automatic Order Status Voice Announcements
   useEffect(() => {
     if (!isTrackMode) return;
-    
+
     let speechText = '';
     if (trackStep === 1) speechText = language === 'Tamil' ? "உங்கள் ஆர்டர் பெறப்பட்டது." : "Your order has been received.";
     else if (trackStep === 2) speechText = language === 'Tamil' ? "உங்கள் உணவு தயாராகிக்கொண்டிருக்கிறது." : "Your food is now being prepared.";
@@ -128,8 +145,9 @@ const TakeAwayOrderSuccess = () => {
     }
   }, [trackStep, isTrackMode, language]);
 
-  // Use DB order ID if available, else random
-  const orderId = dbOrderId || `UDP-${Math.floor(100000 + Math.random() * 900000)}`;
+  const orderId = activeOrderId
+    ? (String(activeOrderId).startsWith('ORD-') ? activeOrderId : `ORD-${String(activeOrderId).padStart(6, '0')}`)
+    : `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
 
   const handleCallRestaurant = () => {
     setToastMessage(
@@ -141,13 +159,12 @@ const TakeAwayOrderSuccess = () => {
     setTimeout(() => setShowToast(false), 3000);
   };
 
-  // UI translations helper
   const translate = (en, ta) => (language === 'Tamil' ? ta : en);
+  const displayCartData = cartData.length > 0 ? cartData : (fetchedOrder?.items || []);
+  const displayTotal = total > 0 ? total : (fetchedOrder?.order?.total_amount || 0);
+  const isLoadingOrder = cartData.length === 0 && !fetchedOrder;
+  const totalItemsCount = isLoadingOrder ? "..." : displayCartData.reduce((acc, item) => acc + item.quantity, 0);
 
-  // Calculate total items quantity
-  const totalItemsCount = cartData.reduce((acc, item) => acc + item.quantity, 0);
-
-  // Dynamic status headlines & descriptions
   const getStatusHeadline = () => {
     if (dbStatus === 'CANCELLED') return translate('Cancelled', 'இரத்து செய்யப்பட்டது');
     if (trackStep === 1) return translate('Order Received', 'ஆர்டர் பெறப்பட்டது');
@@ -182,7 +199,14 @@ const TakeAwayOrderSuccess = () => {
   return (
     <div className="os-page">
       <div className="os-bg" />
-      <Header tableNumber="06" showFullHeader={true} useTitleImage={true} showDateTime={true} hideTableIndicator={true} />
+      <Header 
+        tableNumber="06" 
+        showFullHeader={true} 
+        useTitleImage={true} 
+        showDateTime={true} 
+        hideTableIndicator={true} 
+        disableNavigation={!isFinalScreen} 
+      />
 
       <main className="os-main">
         {isFinalScreen ? (
@@ -202,17 +226,21 @@ const TakeAwayOrderSuccess = () => {
             </p>
 
             <div className="os-actions" style={{ maxWidth: '400px', margin: '0 auto' }}>
-              <button className="os-home-btn" onClick={() => navigate('/')}>
+              <button className="os-home-btn" onClick={() => {
+                sessionStorage.removeItem('chatbot_flow_stage');
+                sessionStorage.removeItem('last_placed_order_id');
+                navigate('/');
+              }}>
                 <i className="fa-solid fa-house" /> {translate('Back to Home', 'முகப்பு')}
               </button>
               <button className="os-download-btn" onClick={() => {
                 navigate('/invoice', {
                   state: {
                     orderId,
-                    cartData,
+                    cartData: displayCartData,
                     subtotal,
                     gst,
-                    finalTotal: total,
+                    finalTotal: displayTotal,
                     mobileNumber: formData.phone || 'WALK-IN',
                     paymentMethod
                   }
@@ -253,7 +281,7 @@ const TakeAwayOrderSuccess = () => {
               </div>
               <div className="os-meta-item">
                 <span className="os-meta-label">{translate('Paid', 'செலுத்தப்பட்டது')}</span>
-                <span className="os-meta-value os-total">Rs. {Number(total).toFixed(0)}</span>
+                <span className="os-meta-value os-total">{isLoadingOrder ? "..." : `Rs. ${Number(displayTotal).toFixed(0)}`}</span>
               </div>
             </div>
 
@@ -269,13 +297,6 @@ const TakeAwayOrderSuccess = () => {
             <button className="os-track-btn" onClick={() => setIsTrackMode(true)}>
               {translate('Track Order', 'ஆர்டரைக் கண்காணிக்கவும்')}
             </button>
-
-            {/* Back to Menu link */}
-            <div style={{ marginTop: '10px' }}>
-              <button className="os-back-link" onClick={() => navigate('/takeaway-payment')}>
-                <i className="fa-solid fa-arrow-left" /> {translate('Back to Payment', 'கட்டண பக்கத்திற்கு திரும்பு')}
-              </button>
-            </div>
           </div>
         ) : (
           /* SCREENS 2, 3, 4: LIVE TAKEAWAY TRACKING */
@@ -350,10 +371,10 @@ const TakeAwayOrderSuccess = () => {
             </div>
 
             {/* Order Summary Box */}
-            {cartData.length > 0 && (
+            {displayCartData.length > 0 && (
               <div className="os-summary-card">
                 <h4 className="os-summary-title">{translate('Your Order', 'உங்கள் ஆர்டர்')}</h4>
-                {cartData.map(item => (
+                {displayCartData.map(item => (
                   <div key={item.id} className="os-summary-row">
                     <span>{item.quantity} x {item.name}</span>
                     <span>Rs. {item.price * item.quantity}</span>
@@ -361,24 +382,21 @@ const TakeAwayOrderSuccess = () => {
                 ))}
                 <div className="os-summary-total">
                   <span>{translate('Total :', 'மொத்தம் :')}</span>
-                  <span>Rs. {Number(total).toFixed(0)}</span>
+                  <span>Rs. {Number(displayTotal).toFixed(0)}</span>
                 </div>
               </div>
             )}
 
             {/* Action Buttons */}
             <div className="os-track-actions">
-              <button className="os-btn-call" onClick={handleCallRestaurant}>
+              <button className="os-btn-call" onClick={handleCallRestaurant} style={{ width: '100%' }}>
                 <i className="fa-solid fa-phone" /> {translate('Call Restaurant', 'உணவகத்தை அழைக்கவும்')}
               </button>
-              <button className="os-btn-more" onClick={() => navigate('/take-away')}>
-                {translate('Order More', 'மேலும் ஆர்டர் செய்க')}
-              </button>
+              {/* Order More button removed until order is completed */}
             </div>
           </div>
         )}
       </main>
-
 
       {/* Floating Toast Notification */}
       <div className={`os-toast-notif ${showToast ? 'show' : ''}`}>

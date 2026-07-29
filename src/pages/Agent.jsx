@@ -98,7 +98,7 @@ function Agent() {
   if (recognition) {
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.lang = language === 'English' ? 'en-US' : 'ta-IN';
+    recognition.lang = language === 'English' ? 'en-IN' : 'ta-IN';
 
     recognition.onstart = () => {
       setIsListening(true);
@@ -143,38 +143,81 @@ function Agent() {
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = language === 'English' ? 'en-US' : 'ta-IN';
 
     const voices = window.speechSynthesis.getVoices();
-    const charonVoice = voices.find(v => v.name.toLowerCase().includes('charon'));
 
-    if (charonVoice) {
-      utterance.voice = charonVoice;
-      utterance.pitch = 0.95;
-      utterance.rate = 1.0;
+    // Consistent Voice Selection throughout the app (Female voice preference)
+    const englishVoice = voices.find(v => {
+      const n = v.name.toLowerCase();
+      return v.lang.startsWith('en') && (
+        n.includes('google us english') ||
+        n.includes('google uk english female') ||
+        n.includes('sangeeta') ||
+        n.includes('zira') ||
+        n.includes('samantha') ||
+        n.includes('female') ||
+        n.includes('natural')
+      );
+    }) || voices.find(v => v.lang.startsWith('en'));
+
+    const tamilVoice = voices.find(v => {
+      const n = v.name.toLowerCase();
+      return v.lang.startsWith('ta') && (
+        n.includes('google') ||
+        n.includes('valluvar') ||
+        n.includes('natural') ||
+        n.includes('female') ||
+        n.includes('sangeeta') ||
+        n.includes('vani') ||
+        n.includes('latha')
+      );
+    }) || voices.find(v => v.lang.startsWith('ta'));
+
+    const hasTamil = /[\u0b80-\u0bff]/.test(text);
+    const hasHindi = /[\u0900-\u097f]/.test(text);
+    const hasKannada = /[\u0c80-\u0cff]/.test(text);
+    const hasTelugu = /[\u0c00-\u0c7f]/.test(text);
+    const hasMalayalam = /[\u0d00-\u0d7f]/.test(text);
+
+    if (hasTamil) {
+      if (tamilVoice) utterance.voice = tamilVoice;
+      utterance.lang = 'ta-IN';
+      utterance.pitch = 1.0;
+      utterance.rate = 0.95;
+    } else if (hasHindi) {
+      const hindiVoice = voices.find(v => v.lang.startsWith('hi')) || englishVoice;
+      if (hindiVoice) utterance.voice = hindiVoice;
+      utterance.lang = 'hi-IN';
+      utterance.pitch = 1.0;
+      utterance.rate = 0.95;
+    } else if (hasKannada) {
+      const kannadaVoice = voices.find(v => v.lang.startsWith('kn')) || englishVoice;
+      if (kannadaVoice) utterance.voice = kannadaVoice;
+      utterance.lang = 'kn-IN';
+      utterance.pitch = 1.0;
+      utterance.rate = 0.95;
+    } else if (hasTelugu) {
+      const teluguVoice = voices.find(v => v.lang.startsWith('te')) || englishVoice;
+      if (teluguVoice) utterance.voice = teluguVoice;
+      utterance.lang = 'te-IN';
+      utterance.pitch = 1.0;
+      utterance.rate = 0.95;
+    } else if (hasMalayalam) {
+      const malayalamVoice = voices.find(v => v.lang.startsWith('ml')) || englishVoice;
+      if (malayalamVoice) utterance.voice = malayalamVoice;
+      utterance.lang = 'ml-IN';
+      utterance.pitch = 1.0;
+      utterance.rate = 0.95;
+    } else if (language === 'Tamil') {
+      if (tamilVoice) utterance.voice = tamilVoice;
+      utterance.lang = 'ta-IN';
+      utterance.pitch = 1.0;
+      utterance.rate = 0.95;
     } else {
-      const requestedVoice = voices.find(v => {
-        const n = v.name.toLowerCase();
-        return n.includes('achird') || n.includes('sulafat') || n.includes('aoede');
-      });
-
-      if (requestedVoice) {
-        utterance.voice = requestedVoice;
-        const vName = requestedVoice.name.toLowerCase();
-        if (vName.includes('sulafat')) {
-          utterance.pitch = 1.0;
-          utterance.rate = 0.95;
-        } else if (vName.includes('aoede')) {
-          utterance.pitch = 1.25;
-          utterance.rate = 1.05;
-        } else {
-          utterance.pitch = 1.1;
-          utterance.rate = 1.0;
-        }
-      } else {
-        utterance.rate = 1.0;
-        utterance.pitch = 1.1;
-      }
+      if (englishVoice) utterance.voice = englishVoice;
+      utterance.lang = 'en-US';
+      utterance.pitch = 1.05;
+      utterance.rate = 0.95;
     }
 
     window.speechSynthesis.speak(utterance);

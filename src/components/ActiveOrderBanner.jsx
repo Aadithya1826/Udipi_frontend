@@ -9,7 +9,9 @@ const ActiveOrderBanner = () => {
   const [tableNumber, setTableNumber] = useState(null);
 
   const checkActiveOrder = () => {
-    setActiveOrderId(localStorage.getItem('active_order_id'));
+    let id = localStorage.getItem('active_order_id');
+    if (id === 'null' || id === 'undefined') id = null;
+    setActiveOrderId(id);
     setActiveOrderType(localStorage.getItem('active_order_type'));
     setTableNumber(localStorage.getItem('active_table_number'));
   };
@@ -21,9 +23,46 @@ const ActiveOrderBanner = () => {
     return () => window.removeEventListener('storage', checkActiveOrder);
   }, [location.pathname]);
 
-  // Don't show the banner on the tracking pages themselves
+  const [isValidating, setIsValidating] = useState(false);
+  const [isOrderValid, setIsOrderValid] = useState(true); // Assume true initially to prevent flicker
+
+  useEffect(() => {
+    let isMounted = true;
+    const verifyOrder = async () => {
+      if (!activeOrderId) return;
+      setIsValidating(true);
+      try {
+        const res = await fetch(`/api/orders/${activeOrderId}`);
+        if (!res.ok) {
+          if (isMounted) setIsOrderValid(false);
+          return;
+        }
+        const data = await res.json();
+        const status = data.order?.status || data.status;
+        if (['SERVED', 'COMPLETED', 'CANCELLED'].includes(status)) {
+          localStorage.removeItem('active_order_id');
+          localStorage.removeItem('active_order_type');
+          localStorage.removeItem('active_table_number');
+          if (isMounted) {
+            setIsOrderValid(false);
+            setActiveOrderId(null);
+          }
+        } else {
+          if (isMounted) setIsOrderValid(true);
+        }
+      } catch (err) {
+        console.warn("Failed to verify active order status");
+      } finally {
+        if (isMounted) setIsValidating(false);
+      }
+    };
+    verifyOrder();
+    return () => { isMounted = false; };
+  }, [activeOrderId]);
+
+  // Don't show the banner on the tracking pages themselves, or if invalid
   const hidePaths = ['/order-success', '/takeaway-order-success', '/invoice'];
-  if (!activeOrderId || hidePaths.includes(location.pathname)) return null;
+  if (!activeOrderId || !isOrderValid || hidePaths.includes(location.pathname)) return null;
 
   const handleTrackClick = () => {
     if (activeOrderType === 'takeaway') {

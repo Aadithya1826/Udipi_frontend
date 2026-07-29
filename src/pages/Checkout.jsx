@@ -23,7 +23,7 @@ const Checkout = ({ isTakeaway }) => {
     name: location.state?.formData?.name || sessionStorage.getItem('customer_name') || '',
     phone: location.state?.formData?.phone || sessionStorage.getItem('customer_phone') || ''
   }));
-  
+
   const [nameError, setNameError] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
@@ -37,11 +37,12 @@ const Checkout = ({ isTakeaway }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
+
     if (name === 'phone') {
       const onlyNums = value.replace(/[^0-9]/g, '');
       setFormData(prev => ({ ...prev, [name]: onlyNums }));
-      
+      sessionStorage.setItem('customer_phone', onlyNums);
+
       if (hasAttemptedSubmit) {
         if (!/^\d{10}$/.test(onlyNums)) {
           setPhoneError(language === 'Tamil' ? 'தயவுசெய்து சரியான தொலைபேசி எண்ணை உள்ளிடவும்.' : 'Please enter a valid phone number.');
@@ -53,7 +54,10 @@ const Checkout = ({ isTakeaway }) => {
     }
 
     setFormData(prev => ({ ...prev, [name]: value }));
-    
+    if (name === 'name') {
+      sessionStorage.setItem('customer_name', value);
+    }
+
     if (hasAttemptedSubmit && name === 'name') {
       if (!value.trim()) {
         setNameError(language === 'Tamil' ? 'தயவுசெய்து உங்கள் பெயரை உள்ளிடவும்.' : 'Please enter your full name.');
@@ -64,14 +68,17 @@ const Checkout = ({ isTakeaway }) => {
   };
 
   const handleBlur = (e) => {
-    if (e.target.name === 'phone') {
+    const { name, value } = e.target;
+    if (name === 'phone') {
+      sessionStorage.setItem('customer_phone', value);
       if (formData.phone && !/^\d{10}$/.test(formData.phone)) {
         setPhoneError(language === 'Tamil' ? 'தயவுசெய்து சரியான தொலைபேசி எண்ணை உள்ளிடவும்.' : 'Please enter a valid phone number.');
       } else {
         setPhoneError('');
       }
     }
-    if (e.target.name === 'name') {
+    if (name === 'name') {
+      sessionStorage.setItem('customer_name', value);
       if (!formData.name.trim()) {
         setNameError(language === 'Tamil' ? 'தயவுசெய்து உங்கள் பெயரை உள்ளிடவும்.' : 'Please enter your full name.');
       } else {
@@ -79,6 +86,7 @@ const Checkout = ({ isTakeaway }) => {
       }
     }
   };
+
 
   useEffect(() => {
     const handleUpdateName = (e) => {
@@ -99,25 +107,25 @@ const Checkout = ({ isTakeaway }) => {
       setFormData(currentFormData => {
         setHasAttemptedSubmit(true);
         let valid = true;
-        
+
         if (!currentFormData.name.trim()) {
           setNameError(language === 'Tamil' ? 'தயவுசெய்து உங்கள் பெயரை உள்ளிடவும்.' : 'Please enter your full name.');
           valid = false;
         } else {
           setNameError('');
         }
-        
+
         if (!/^\d{10}$/.test(currentFormData.phone)) {
           setPhoneError(language === 'Tamil' ? 'தயவுசெய்து சரியான தொலைபேசி எண்ணை உள்ளிடவும்.' : 'Please enter a valid phone number.');
           valid = false;
         } else {
           setPhoneError('');
         }
-        
+
         if (!valid) {
           return currentFormData;
         }
-        
+
         const paymentRoute = isTakeaway ? '/takeaway-payment' : '/payment';
         navigate(paymentRoute, {
           state: {
@@ -145,7 +153,7 @@ const Checkout = ({ isTakeaway }) => {
     if (e && e.preventDefault) e.preventDefault();
     setHasAttemptedSubmit(true);
     let valid = true;
-    
+
     if (!formData.name.trim()) {
       setNameError(language === 'Tamil' ? 'தயவுசெய்து உங்கள் பெயரை உள்ளிடவும்.' : 'Please enter your full name.');
       valid = false;
@@ -196,8 +204,8 @@ const Checkout = ({ isTakeaway }) => {
               <div className={`form-group ${nameError ? 'has-error' : ''}`}>
                 <label>Full Name*</label>
                 <div className="input-wrapper">
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
@@ -212,10 +220,10 @@ const Checkout = ({ isTakeaway }) => {
               <div className={`form-group ${phoneError ? 'has-error' : ''}`}>
                 <label>Phone Number*</label>
                 <div className="input-wrapper">
-                  <input 
-                    type="tel" 
+                  <input
+                    type="tel"
                     name="phone"
-                    placeholder="10 digit number" 
+                    placeholder="10 digit number"
                     value={formData.phone}
                     onChange={handleChange}
                     onBlur={handleBlur}
@@ -229,8 +237,8 @@ const Checkout = ({ isTakeaway }) => {
 
               <div className="form-group">
                 <label>Table No*</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={isTakeaway ? 'TakeAway' : (tableNumber || '6')}
                   readOnly
                   disabled
@@ -297,13 +305,13 @@ const Checkout = ({ isTakeaway }) => {
               <i className="fa-solid fa-xmark"></i>
             </button>
           </div>
-          
+
           <div className="di-cart-items">
             {cart.map((item, index) => (
               <div key={`${item.id}-${index}`} className="di-cart-item-container">
                 <div className="di-cart-item-body">
                   <div className="di-cart-item-thumb">
-                    {item.image ? <img src={item.image} alt={item.name} /> : <div style={{width:'100%', height:'100%', background:'#eee'}}></div>}
+                    {item.image ? <img src={item.image} alt={item.name} /> : <div style={{ width: '100%', height: '100%', background: '#eee' }}></div>}
                   </div>
                   <div className="di-cart-item-details">
                     <h4 className="di-cart-item-name">{language === 'Tamil' && item.tamilName ? item.tamilName : item.name}</h4>
@@ -315,7 +323,7 @@ const Checkout = ({ isTakeaway }) => {
                     <p className="di-cart-total-amount">{(item.price * item.quantity).toFixed(2)}</p>
                     <div className="di-cart-stepper">
                       <button className="di-cart-qty-btn minus" onClick={() => changeQty(item.id, -1)}>−</button>
-                      <input 
+                      <input
                         className="di-cart-qty-num"
                         type="text"
                         inputMode="numeric"
