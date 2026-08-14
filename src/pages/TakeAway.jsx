@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
 import { useCart } from '../context/CartContext'
+import { useVoiceAgent } from '../context/VoiceAgentContext'
 import Header from '../components/Header'
 // Menu data is fetched directly below
 import '../styles/pages.css'
@@ -30,7 +31,6 @@ function MenuCard({ item, qty, onAdd, onInc, onDec, onUpdateQty, hasActiveOrder 
 
       <div className="fg-card-content">
         <h3 className="fg-card-title">
-          {item.itemCode && <span className="item-code-badge">[{item.itemCode}] </span>}
           {language === 'Tamil' && item.tamilName ? item.tamilName : item.name}
         </h3>
         <p className="fg-card-desc">{language === 'Tamil' && item.tamilDesc ? item.tamilDesc : item.description}</p>
@@ -107,6 +107,7 @@ export default function TakeAway() {
   const navigate = useNavigate()
   const location = useLocation()
   const { t, language } = useLanguage()
+  const { isAgentOpen } = useVoiceAgent()
   const {
     cart,
     setCart,
@@ -128,7 +129,8 @@ export default function TakeAway() {
   const [topHeight] = useState(100)
   const [cardScale] = useState(1.0)
 
-  const [menuCategories, setMenuCategories] = useState([{ id: 'all', name: 'All Menu', image: null }])
+  const [activeRegion, setActiveRegion] = useState('all')
+  const [menuCategories, setMenuCategories] = useState([{ id: 'all', name: 'All', image: null, region: 'all' }])
   const [menuItems, setMenuItems] = useState({ all: [] })
   const [loading, setLoading] = useState(true)
 
@@ -139,16 +141,52 @@ export default function TakeAway() {
   const filterDropdownRef = useRef(null)
 
   useEffect(() => {
+    if (activeRegion !== 'all') {
+      const validCats = menuCategories.filter(c => c.region === 'all' || c.region === activeRegion);
+      if (!validCats.find(c => c.id === activeCategory)) {
+        setActiveCategory('all');
+      }
+    }
+  }, [activeRegion, menuCategories, activeCategory, setActiveCategory]);
+
+  useEffect(() => {
     function handleClickOutside(event) {
       if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target)) {
         setShowFilterDropdown(false);
       }
     }
+    const handleChangeCategory = (e) => {
+      const catId = e.detail?.categoryId;
+      if (catId) {
+        setActiveCategory(catId);
+        const catObj = menuCategories.find(c => String(c.id) === String(catId));
+        if (catObj) {
+          const isNorthIndian = (name) => {
+             const lower = name.toLowerCase();
+             return lower.includes('north indian') || lower.includes('tandoori') || lower.includes('noodles') || lower.includes('salad') || lower.includes('raitha') || lower.includes('soups');
+          };
+          setActiveRegion(isNorthIndian(catObj.name) ? 'north' : 'south');
+        }
+      }
+    };
+
+    const handleChangeRegion = (e) => {
+      const region = e.detail?.region;
+      if (region) {
+        setActiveRegion(region);
+        setActiveCategory('all');
+      }
+    };
+
     document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener('change-category', handleChangeCategory);
+    document.addEventListener('change-region', handleChangeRegion);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener('change-category', handleChangeCategory);
+      document.removeEventListener('change-region', handleChangeRegion);
     };
-  }, []);
+  }, [menuCategories, setActiveCategory, setActiveRegion]);
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -158,21 +196,40 @@ export default function TakeAway() {
     // Fetch menu data from backend
     async function fetchMenuData() {
       try {
-        const catRes = await fetch('/api/v1/public/menu/categories');
-        const dbCategories = await catRes.json();
+        const restaurantId = localStorage.getItem('selected_restaurant_id') || '1';
+        const API_BASE = import.meta.env.VITE_API_URL || '';
         
-        const itemRes = await fetch('/api/v1/public/menu/items');
+        const catRes = await fetch(`${API_BASE}/api/v1/public/menu/categories?restaurant_id=${restaurantId}`);
+        const dbCategories = await catRes.json();
+
+        const itemRes = await fetch(`${API_BASE}/api/v1/public/menu/items?restaurant_id=${restaurantId}`);
         const dbItems = await itemRes.json();
+
+        const cleanCategoryName = (name) => {
+          if (!name) return '';
+          let clean = name.trim();
+          clean = clean.replace(/\s*\(.*?\)\s*/g, ' ').trim();
+          return clean;
+        };
+
+        const isNorthIndian = (name) => {
+           const lower = name.toLowerCase();
+           return lower.includes('north indian') || lower.includes('tandoori') || lower.includes('noodles') || lower.includes('salad') || lower.includes('raitha') || lower.includes('soups');
+        };
 
         const catIdMap = {};
         const uniqueCategories = [];
         const seenNames = new Map();
-        
+
         for (const cat of dbCategories) {
-          const normName = cat.name.trim().toLowerCase();
+          const cleanedName = cleanCategoryName(cat.name);
+          if (!cleanedName) continue;
+          if (cleanedName.includes('_')) continue;
+          
+          const normName = cleanedName.toLowerCase();
           if (!seenNames.has(normName)) {
             seenNames.set(normName, cat.id);
-            uniqueCategories.push(cat);
+            uniqueCategories.push({ ...cat, name: cleanedName });
             catIdMap[cat.id] = cat.id;
           } else {
             catIdMap[cat.id] = seenNames.get(normName);
@@ -180,18 +237,30 @@ export default function TakeAway() {
         }
 
         const formattedCategories = [
-          { id: 'all', name: 'All Menu', image: null },
+          { id: 'all', name: 'All', image: null, region: 'all' },
           ...uniqueCategories.map(c => ({
             id: String(c.id),
             name: c.name,
-            image: c.image_url || null
+            image: c.image_url ? (c.image_url.startsWith('http') ? c.image_url : `http://dev-api.dataudipi.com${c.image_url}`) : null,
+            region: isNorthIndian(c.name) ? 'north' : 'south'
           }))
         ];
 
         const formattedItems = {};
         const allItems = [];
         
+        // Deduplicate items: keep only the highest ID for a given name
+        const uniqueItemsMap = new Map();
         dbItems.forEach(item => {
+          const normName = (item.name || '').trim().toLowerCase();
+          const existing = uniqueItemsMap.get(normName);
+          if (!existing || item.id > existing.id) {
+            uniqueItemsMap.set(normName, item);
+          }
+        });
+        const deduplicatedDbItems = Array.from(uniqueItemsMap.values());
+
+        deduplicatedDbItems.forEach(item => {
           const rawCatId = item.category_id;
           const catId = String(catIdMap[rawCatId] || rawCatId);
           const formattedItem = {
@@ -200,7 +269,7 @@ export default function TakeAway() {
             name: item.name,
             tamilName: item.name, // Fallback to english if tamil not available
             price: Number(item.price),
-            image: item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `${import.meta.env.VITE_API_URL || ''}${item.image_url}`) : null,
+            image: item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `http://dev-api.dataudipi.com${item.image_url}`) : null,
             description: item.description,
             tamilDesc: item.description,
             available: item.is_available,
@@ -265,7 +334,7 @@ export default function TakeAway() {
   const displayItems = (isMobile && !showAllItems) ? processedItems.slice(0, 6) : processedItems
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${isAgentOpen ? 'agent-open' : ''}`}>
       <div className="background-image" />
       <Header tableNumber="06" showFullHeader={true} useTitleImage={true} hideTableIndicator={true} />
 
@@ -346,8 +415,19 @@ export default function TakeAway() {
             </div>
           </div>
 
+          <div className="di-region-tabs-wrap">
+            <button className={`di-region-tab ${activeRegion === 'all' ? 'active' : ''}`} onClick={() => setActiveRegion('all')}>
+              All Regions
+            </button>
+            <button className={`di-region-tab ${activeRegion === 'south' ? 'active' : ''}`} onClick={() => setActiveRegion('south')}>
+              South Indian
+            </button>
+            <button className={`di-region-tab ${activeRegion === 'north' ? 'active' : ''}`} onClick={() => setActiveRegion('north')}>
+              North Indian
+            </button>
+          </div>
           <div className="di-tabs-wrap">
-            {menuCategories.map(cat => (
+            {menuCategories.filter(cat => activeRegion === 'all' || cat.region === 'all' || cat.region === activeRegion).map(cat => (
               <button key={cat.id} className={`di-tab ${activeCategory === cat.id ? 'active' : ''}`} onClick={() => setActiveCategory(cat.id)}>
                 {cat.image && <img src={cat.image} alt={t(cat.name)} className="di-tab-img" onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }} />}
                 <span>{language === 'Tamil' && cat.tamilName ? cat.tamilName : t(cat.name)}</span>

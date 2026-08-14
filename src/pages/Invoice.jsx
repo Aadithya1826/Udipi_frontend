@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AIAssistantOverlay from '../components/AIAssistantOverlay';
 import '../styles/invoice.css';
-import restaurantBgImg from '../assets/images/restaurant_bg.png';
-import udupiBannerImg from '../assets/images/udupi-banner.png';
+const restaurantBgImg = `${import.meta.env.VITE_API_URL}/static/assets/images/restaurant_bg.png`;
+const udupiBannerImg = `${import.meta.env.VITE_API_URL}/static/assets/images/udupi-banner.png`;
 
 export default function Invoice({ embeddedData }) {
   const location = useLocation();

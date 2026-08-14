@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header';
 import { useCart } from '../context/CartContext';
 import '../styles/checkout.css';
 import { useLanguage } from '../context/LanguageContext';
+import { useVoiceAgent } from '../context/VoiceAgentContext';
 const Checkout = ({ isTakeaway }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, language } = useLanguage();
+  const { agentState, setFlowStage, isAgentOpen } = useVoiceAgent();
+  const autoFillRef = useRef(false);
   const {
     cart,
     subtotal,
@@ -19,14 +22,18 @@ const Checkout = ({ isTakeaway }) => {
     setIsCartOpen
   } = useCart();
 
+  // Priority: VoiceAgentContext > location.state > sessionStorage
   const [formData, setFormData] = useState(() => ({
-    name: location.state?.formData?.name || sessionStorage.getItem('customer_name') || '',
-    phone: location.state?.formData?.phone || sessionStorage.getItem('customer_phone') || ''
+    name:  agentState?.customerName  || location.state?.formData?.name  || sessionStorage.getItem('customer_name')  || '',
+    phone: agentState?.mobileNumber  || location.state?.formData?.phone || sessionStorage.getItem('customer_phone') || ''
   }));
+  const isAgentFilled = !!(agentState?.customerName && agentState?.mobileNumber);
 
   const [nameError, setNameError] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+  const [autoTransitioning, setAutoTransitioning] = useState(false);
+  const [countdown, setCountdown] = useState(null);
 
   // Redirect back if cart is empty
   useEffect(() => {
@@ -34,6 +41,34 @@ const Checkout = ({ isTakeaway }) => {
       navigate(isTakeaway ? '/take-away' : '/dine-in');
     }
   }, [cart, navigate, isTakeaway]);
+
+  // Sync agent-provided data when context updates
+  useEffect(() => {
+    if (agentState?.customerName && agentState?.mobileNumber && !autoFillRef.current) {
+      setFormData({ name: agentState.customerName, phone: agentState.mobileNumber });
+    }
+  }, [agentState?.customerName, agentState?.mobileNumber]);
+
+  // Auto-transition to payment when agent navigates to checkout
+  useEffect(() => {
+    if (!isAgentFilled) return;
+    if (agentState?.flowStage === 'CHECKOUT_REVIEW') {
+      setAutoTransitioning(true);
+      let c = 3;
+      setCountdown(c);
+      const tick = setInterval(() => {
+        c -= 1;
+        setCountdown(c);
+        if (c <= 0) {
+          clearInterval(tick);
+          const paymentRoute = isTakeaway ? '/takeaway-payment' : '/payment';
+          setFlowStage('PAYMENT_SELECT');
+          navigate(paymentRoute, { state: { ...location.state, formData } });
+        }
+      }, 1000);
+      return () => clearInterval(tick);
+    }
+  }, [agentState?.flowStage, isAgentFilled]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -183,7 +218,7 @@ const Checkout = ({ isTakeaway }) => {
   const backLink = isTakeaway ? '/take-away' : '/dine-in';
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${isAgentOpen ? 'agent-open' : ''}`}>
       <div className="background-image" />
       <Header tableNumber={isTakeaway ? '06' : tableNumber} showFullHeader={true} useTitleImage={true} hideTableIndicator={isTakeaway} />
 
@@ -197,6 +232,30 @@ const Checkout = ({ isTakeaway }) => {
 
             <h1 className="checkout-title">Checkout</h1>
             <p className="checkout-subtitle">{isTakeaway ? 'Take Away Order' : 'Dine In Order'}</p>
+
+            {/* Auto-transition banner */}
+            {autoTransitioning && (
+              <div style={{
+                background: 'linear-gradient(135deg,#ff4e00,#ec9f05)',
+                color: '#fff', borderRadius: '12px', padding: '12px 18px',
+                marginBottom: '16px', fontSize: '14px', fontWeight: 600,
+                display: 'flex', alignItems: 'center', gap: '10px'
+              }}>
+                <i className="fa-solid fa-wand-magic-sparkles" />
+                Proceeding to payment in {countdown}s…
+              </div>
+            )}
+
+            {/* Agent-filled indicator */}
+            {isAgentFilled && !autoTransitioning && (
+              <div style={{
+                background: 'rgba(255,78,0,0.08)', border: '1px solid rgba(255,78,0,0.2)',
+                borderRadius: '10px', padding: '8px 14px', marginBottom: '14px',
+                display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#ff4e00', fontWeight: 600
+              }}>
+                <i className="fa-solid fa-microphone" /> Auto-filled by Voice Agent
+              </div>
+            )}
 
             <h3 className="checkout-section-title">Customer details</h3>
 

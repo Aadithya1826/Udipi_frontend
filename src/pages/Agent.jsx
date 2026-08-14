@@ -4,8 +4,9 @@ import { useLanguage } from '../context/LanguageContext'
 import { useCart } from '../context/CartContext'
 import Header from '../components/Header'
 import { fetchCategories, fetchItems, formatMenuData, placeOrder } from '../services/menuService'
+import { sendToCustomerMCP } from '../services/mcpCustomerService'
 import '../styles/pages.css'
-import agentwaiterLogoImg from '../assets/images/agentwaiter_logo.png'
+const agentwaiterLogoImg = `${import.meta.env.VITE_API_URL}/static/assets/images/agentwaiter_logo.png`;
 
 function Agent() {
   const navigate = useNavigate()
@@ -33,6 +34,8 @@ function Agent() {
   const [menuItems, setMenuItems] = useState({ all: [] });
   const [allItems, setAllItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [orderType, setOrderType] = useState(() => localStorage.getItem('active_order_type') || '');
+  const [customerName, setCustomerName] = useState('');
 
   useEffect(() => {
     async function loadData() {
@@ -226,227 +229,101 @@ function Agent() {
   const handleSendMessage = async (textToSubmit = inputText) => {
     if (!textToSubmit.trim()) return;
 
-    const lowerText = textToSubmit.toLowerCase();
-
-    // Task 2: Check for menu items in the text
-    const normalize = (s) => s.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "").replace(/\s{2,}/g, " ").trim();
-    let normalizedInput = normalize(lowerText).replace(/\*{2,}/g, 'mushroom').replace(/\bshroom\b/gi, 'mushroom').replace(/\bmusroom\b/gi, 'mushroom');
-    Object.entries(phoneticMap).forEach(([wrong, right]) => {
-      const safeWrong = wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const isSpecial = /[.*+?^${}()|[\]\\]/.test(wrong);
-      const pattern = isSpecial ? safeWrong : `\\b${safeWrong}\\b`;
-      normalizedInput = normalizedInput.replace(new RegExp(pattern, 'gi'), right);
-    });
-
-    const cleanItemName = (str) => (str || '').toLowerCase().replace(/\s*\(\d+.*?\)/g, '').replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, '').trim();
-
-    let foundItem = allItems.find(item => {
-      const cName = cleanItemName(item.name);
-      return normalizedInput.includes(cName) || (item.tamilName && normalizedInput.includes(cleanItemName(item.tamilName)));
-    });
-
-    if (!foundItem && allItems) {
-      foundItem = allItems.find(item => {
-        const cName = cleanItemName(item.name);
-        return cName.includes(normalizedInput) || normalizedInput.includes(cName);
-      });
-    }
-
-    if (foundItem) {
-      handleAddToCart(foundItem);
-      setInputText('');
-      return;
-    }
-
-    if (isAwaitingPayment) {
-      if (lowerText === 'done' || lowerText.includes('done')) {
-        setIsAwaitingPayment(false);
-        setIsLoading(true);
-
-        try {
-          const orderData = {
-            table_number: "06",
-            payment_method: 'UPI',
-            phone: mobileNumber,
-            cart: finalInvoiceData?.cartData.map(item => ({
-              id: item.id,
-              quantity: item.quantity,
-              price: item.price,
-              note: item.note || ''
-            })) || [],
-            subtotal: finalInvoiceData?.subtotal || 0,
-            gst: finalInvoiceData?.gst || 0,
-            service_charge: finalInvoiceData?.service || 0,
-            total_amount: finalInvoiceData?.finalTotal || 0
-          };
-
-          const result = await placeOrder(orderData);
-          const dbId = result.dbOrderId || result.order_id || result.id;
-          const generatedOrderId = result.orderId || (dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`);
-          
-          localStorage.setItem('active_order_id', generatedOrderId);
-          localStorage.setItem('active_order_type', 'agent');
-          
-          navigate('/invoice', { 
-            state: { 
-              orderId: generatedOrderId,
-              cartData: finalInvoiceData?.cartData || [],
-              subtotal: finalInvoiceData?.subtotal || 0,
-              gst: finalInvoiceData?.gst || 0,
-              finalTotal: finalInvoiceData?.finalTotal || 0,
-              mobileNumber: mobileNumber
-            } 
-          });
-        } catch (err) {
-          console.error("Order placement error:", err);
-          navigate('/invoice', { 
-            state: { 
-              orderId: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
-              cartData: finalInvoiceData?.cartData || [],
-              subtotal: finalInvoiceData?.subtotal || 0,
-              gst: finalInvoiceData?.gst || 0,
-              finalTotal: finalInvoiceData?.finalTotal || 0,
-              mobileNumber: mobileNumber
-            } 
-          });
-        } finally {
-          setIsLoading(false);
-        }
-        return;
-      }
-    }
-
-    if (isAwaitingMobile) {
-      if (lowerText === 'done' || lowerText.includes('done')) {
-        if (mobileNumber.length === 10 && /^\d{10}$/.test(mobileNumber)) {
-          setIsAwaitingMobile(false);
-          setIsAwaitingPayment(true);
-          setMessages([{ role: 'model', type: 'qr_prompt' }]);
-          speakText(`${t('qrPrompt')} ${t('scanToPay')} ${t('paymentComplete')}`);
-        } else {
-          setMessages([...messages, { role: 'user', content: textToSubmit }, { role: 'model', content: "Invalid mobile number" }]);
-          speakText(t('invalidMobile'));
-        }
-        setInputText('');
-        return;
-      }
-
-      // Extract numbers spoken if they aren't "done"
-      const extractedNums = textToSubmit.replace(/\D/g, '');
-      if (extractedNums.length > 0) {
-        setMobileNumber(prev => (prev + extractedNums).slice(0, 10));
-        setInputText('');
-        return;
-      }
-    }
-
-    const isCheckoutPending = messages.length > 0 && messages[messages.length - 1].type === 'checkout';
-
-    if (lowerText === 'yes' && isCheckoutPending) {
-      setIsAwaitingMobile(true);
-      setMobileNumber('');
-      setMessages([{ role: 'model', type: 'mobile_prompt' }]);
-      speakText(`${t('enterMobile')} ${t('paymentComplete')}`);
-      setInputText('');
-      return;
-    }
-
-    if ((lowerText === 'yes' || lowerText === 'checkout confirmed') && cart.length > 0) {
-      handleCheckout();
-      setInputText('');
-      return;
-    }
-
-    const userMessage = { role: 'user', content: textToSubmit }
-    const updatedMessages = [...messages, userMessage]
-
-    // Direct check for "show menu" to bypass API connection issues
+    // Direct check for "show menu"
     if (textToSubmit.toLowerCase().includes('show menu')) {
-      setShowMenu(true)
-      setViewMode('grid')
-      const localResponse = "Certainly! Here are our menu categories. You can click on any category to explore the items."
-      setMessages([...updatedMessages, { role: 'model', content: localResponse }])
-      speakText(localResponse)
-      setInputText('')
-      return; // Skip API call and loading state
+      setShowMenu(true);
+      setViewMode('grid');
+      const localResponse = "Certainly! Here are our menu categories.";
+      setMessages(prev => [...prev, { role: 'user', content: textToSubmit }, { role: 'model', content: localResponse }]);
+      speakText(localResponse);
+      setInputText('');
+      return;
     }
 
-    // Regular API flow
-    setMessages(updatedMessages)
-    setInputText('')
-    setIsLoading(true)
+    const userMessage = { role: 'user', content: textToSubmit };
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    setInputText('');
+    setIsLoading(true);
 
     try {
-      // Calling our internal backend proxy instead of Google directly
-      const apiUrl = '/api/chat'
+      const response = await sendToCustomerMCP({
+        prompt: textToSubmit,
+        chatHistory: updatedMessages.slice(0, -1).map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', text: m.content })),
+        isVoice: false,
+        restaurantId: parseInt(localStorage.getItem('selected_restaurant_id')) || 1,
+        orderId: localStorage.getItem('active_order_id')
+      });
 
-      const apiMessages = updatedMessages
-        .filter(msg => msg.content && typeof msg.content === 'string')
-        .map(msg => ({
-          role: msg.role === 'model' ? 'model' : 'user',
-          parts: [{ text: msg.content }]
-        }));
-
-      // Gemini requires the conversation to end with a 'user' message
-      if (apiMessages.length === 0 || apiMessages[apiMessages.length - 1].role === 'model') {
-        apiMessages.push({
-          role: 'user',
-          parts: [{ text: textToSubmit }]
-        });
+      if (response.assistant_text) {
+        setMessages(prev => [...prev, { role: 'model', content: response.assistant_text }]);
+        speakText(response.assistant_text);
       }
 
-      const payload = {
-        mode: 'full_page',
-        context: { language },
-        contents: apiMessages
+      const actions = response.ui_actions || [];
+      if (response.tool_name) {
+         actions.push({ action: response.tool_name, ...response.parameters, ...response.tool_result });
       }
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        console.error("Chat API error:", data)
-        throw new Error(data.error?.message || `API Error: ${response.status}`)
-      }
-
-      if (data.candidates && data.candidates.length > 0) {
-        let botResponse = data.candidates[0].content.parts[0].text
-
-        // Check for menu trigger
-        if (botResponse.includes('[SHOW_MENU]')) {
-          setShowMenu(true)
-          setViewMode('grid')
-          botResponse = botResponse.replace('[SHOW_MENU]', '').trim()
+      for (const actionObj of actions) {
+        const actionType = (actionObj.action || actionObj.type || actionObj.tool_name || '').toLowerCase();
+        
+        if (actionType === 'set_order_type' || actionType === 'set_order') {
+           const type = (actionObj.type || actionObj.order_type || '').toLowerCase();
+           setOrderType(type);
+           localStorage.setItem('active_order_type', type);
         }
-
-        // Direct check for "review order" via Gemini payload interpretation
-        if (botResponse.toLowerCase().includes('review order') || botResponse.toLowerCase().includes('shall we proceed for checkout')) {
-          setShowMenu(false)
-          setMessages(prev => [...prev, { role: 'model', type: 'review' }])
-          speakText(t('proceedToPayment'))
-          return;
+        else if (actionType === 'add_to_cart' || actionType === 'quick_order') {
+           const itemsToAdd = actionObj.items || (actionObj.item ? [actionObj] : []);
+           for (const reqItem of itemsToAdd) {
+              const realItem = allItems.find(mi => mi.name.toLowerCase() === (reqItem.name || reqItem.item || '').toLowerCase());
+              if (realItem) {
+                 addToCart(realItem, reqItem.quantity || 1);
+              }
+           }
         }
-
-        setMessages(prev => [...prev, { role: 'model', content: botResponse }])
-        speakText(botResponse)
-      } else {
-        console.error("Gemini API - no candidates in response:", data)
-        throw new Error('Invalid response from AI')
+        else if (actionType === 'view_cart' || actionType === 'open_cart') {
+           setShowMenu(false);
+           // Agent page doesn't have an explicit cart drawer by default in this scope, but we can set menu off
+           setMessages(prev => [...prev, { role: 'model', type: 'review' }]);
+        }
+        else if (actionType === 'set_customer' || actionType === 'update_name') {
+           if (actionObj.name || actionObj.customer_name) {
+              setCustomerName(actionObj.name || actionObj.customer_name);
+              // As requested: "if the user name is asked then it should navigate to checkout"
+              if (orderType.includes('takeaway') || orderType.includes('take-away')) {
+                 navigate('/takeaway-checkout');
+              } else {
+                 navigate('/checkout');
+              }
+           }
+        }
+        else if (actionType === 'payment_method' || actionType === 'proceed_to_payment') {
+           // Ask payment mode and then go to live order status
+           const method = (actionObj.method || 'Cash').toLowerCase();
+           const mappedMethod = method.includes('upi') || method.includes('card') ? 'UPI' : 'Cash';
+           
+           if (orderType.includes('takeaway') || orderType.includes('take-away')) {
+              navigate('/takeaway-payment', { state: { autoConfirmMethod: mappedMethod } });
+           } else {
+              navigate('/order-success', { state: { autoTrack: true, tableNumber: '06' } });
+           }
+        }
+        else if (actionType === 'navigate' || actionType === 'navigate_to_page') {
+           const page = (actionObj.page || '').toLowerCase();
+           if (page === 'checkout' || page === 'cart') {
+               navigate(orderType.includes('takeaway') || orderType.includes('take-away') ? '/takeaway-checkout' : '/checkout');
+           } else if (page === 'dine-in') navigate('/dine-in');
+           else if (page === 'takeaway' || page === 'take-away') navigate('/take-away');
+        }
       }
     } catch (error) {
-      console.error("Detailed failure from Gemini:", error)
-      const customerFriendlyError = language === 'English' ? "I'm sorry, I'm having a bit of trouble connecting to the system. Please try asking again in a moment." : "மன்னிக்கவும், கணினியுடன் இணைப்பதில் எனக்குச் சிறு சிக்கல் உள்ளது. தயவுசெய்து சிறிது நேரம் கழித்து மீண்டும் கேட்கவும்.";
-      setMessages(prev => [...prev, { role: 'model', content: customerFriendlyError }])
-      speakText(customerFriendlyError);
+      console.error("MCP Error:", error);
+      const errText = language === 'English' ? "I'm sorry, I'm having a bit of trouble connecting to the system." : "மன்னிக்கவும், பிழை.";
+      setMessages(prev => [...prev, { role: 'model', content: errText }]);
+      speakText(errText);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 

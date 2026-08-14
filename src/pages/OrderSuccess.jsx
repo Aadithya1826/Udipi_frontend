@@ -74,7 +74,8 @@ const OrderSuccess = () => {
     if (!activeOrderId && tableNumber) {
       const fetchTableOrder = async () => {
         try {
-          const res = await fetch(`/api/v1/public/orders/table/${tableNumber}`);
+          const selectedRestaurantId = localStorage.getItem('selected_restaurant_id') || '1';
+          const res = await fetch(`/api/v1/public/orders/table/${tableNumber}?restaurant_id=${selectedRestaurantId}`);
           if (res.ok) {
             const data = await res.json();
             const retrievedId = data.orderId || data.order_id || data.id;
@@ -97,11 +98,27 @@ const OrderSuccess = () => {
     let isMounted = true;
     const checkStatus = async () => {
       try {
-        const res = await fetch(`/api/orders/${activeOrderId}`);
-        if (!res.ok) return;
+        const selectedRestaurantId = localStorage.getItem('selected_restaurant_id') || '1';
+        const res = await fetch(`/api/orders/${activeOrderId}?restaurant_id=${selectedRestaurantId}`);
+        if (!res.ok) {
+          if (res.status === 404 || res.status === 500) {
+            localStorage.removeItem('active_order_id');
+            localStorage.removeItem('active_order_type');
+            localStorage.removeItem('active_table_number');
+            sessionStorage.removeItem('last_placed_order_id');
+            if (isMounted) setDbStatus('CANCELLED');
+          }
+          return;
+        }
         const data = await res.json();
         if (isMounted) {
-          setDbStatus(data.order?.status || data.status);
+          const newStatus = data.order?.status || data.status;
+          setDbStatus(prevStatus => {
+            if (prevStatus !== newStatus) {
+              document.dispatchEvent(new CustomEvent('order-status-update', { detail: { status: newStatus } }));
+            }
+            return newStatus;
+          });
           if (data.order && data.items) {
             setFetchedOrder(data);
           }
@@ -146,25 +163,7 @@ const OrderSuccess = () => {
     }
   }, [dbStatus]);
 
-  // Automatic Order Status Voice Announcements
-  useEffect(() => {
-    if (!isTrackMode) return;
 
-    let speechText = '';
-    if (trackStep === 1) speechText = language === 'Tamil' ? "உங்கள் ஆர்டர் பெறப்பட்டது." : "Your order has been received.";
-    else if (trackStep === 2) speechText = language === 'Tamil' ? "உங்கள் உணவு தயாராகிக்கொண்டிருக்கிறது." : "Your food is now being prepared.";
-    else if (trackStep === 3) speechText = language === 'Tamil' ? "உங்கள் உணவு பரிமாற தயாராக உள்ளது." : "Your order is ready to be served.";
-    else if (trackStep === 4) speechText = language === 'Tamil' ? "உங்கள் உணவு பரிமாறப்பட்டது. மகிழுங்கள்." : "Your order has been served. Enjoy your meal.";
-
-    if (speechText) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(speechText);
-      utterance.lang = language === 'Tamil' ? 'ta-IN' : 'en-IN';
-      utterance.rate = 1.1;
-      utterance.pitch = 1.1;
-      window.speechSynthesis.speak(utterance);
-    }
-  }, [trackStep, isTrackMode, language]);
 
   const orderId = activeOrderId
     ? (String(activeOrderId).startsWith('ORD-') ? activeOrderId : `ORD-${String(activeOrderId).padStart(6, '0')}`)
@@ -273,149 +272,120 @@ const OrderSuccess = () => {
           </div>
         ) : !isTrackMode ? (
           /* SCREEN 1: ORDER SUCCESS CONFIRMATION */
-          <div className="os-card">
-            <div className="os-tick-wrap">
-              <svg className="os-checkmark" viewBox="0 0 52 52">
-                <circle className="os-check-circle" cx="26" cy="26" r="25" fill="none" />
-                <path className="os-check-path" fill="none" d="M14 27 l7 7 l17-17" />
-              </svg>
+          <div className="os-card new-os-card">
+            <button className="new-os-back" onClick={() => navigate('/')}>
+              <i className="fa-solid fa-arrow-left"></i> {translate('Back to Menu', 'மெனுவுக்கு திரும்பு')}
+            </button>
+            <h1 className="new-os-title">{translate('Order Placed Successfully!', 'ஆர்டர் வெற்றிகரமாக செய்யப்பட்டது!')}</h1>
+            
+            <div className="new-os-grid">
+              <div className="new-os-left">
+                <div className="new-os-check-circle">
+                  <i className="fa-solid fa-check"></i>
+                </div>
+                <h2>{translate('Order', 'ஆர்டர்')} #{orderId.replace('ORD-', '').replace(/^0+/, '')}</h2>
+                <p>{translate('Kitchen has received your ticket', 'சமையலறை உங்கள் டிக்கெட்டைப் பெற்றுள்ளது')}</p>
+              </div>
+              
+              <div className="new-os-right">
+                <div className="new-os-prep-time">
+                  <span className="label">{translate('ESTIMATED PREP TIME', 'மதிப்பிடப்பட்ட தயாரிப்பு நேரம்')}</span>
+                  <span className="time">15 - 20 Mins</span>
+                </div>
+                
+                <div className="new-os-summary">
+                  <h3>{translate('Order Summary', 'ஆர்டர் சுருக்கம்')}</h3>
+                  <div className="new-os-summary-items">
+                    {displayCartData.map(item => (
+                      <div key={item.id} className="new-os-summary-row">
+                        <span>{item.quantity} × {item.name}</span>
+                        <span>Rs. {item.price * item.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="new-os-summary-total">
+                    <span>{translate('Total Amount (Paid)', 'மொத்த தொகை (செலுத்தப்பட்டது)')}</span>
+                    <span>Rs. {Number(displayTotal).toFixed(0)}</span>
+                  </div>
+                </div>
+              </div>
             </div>
-
-            <h1 className="os-title">{translate('Order Placed!', 'ஆர்டர் செய்யப்பட்டது!')}</h1>
-            <p className="os-subtitle">
-              {translate('Our chef is preparing your meal with love.', 'எங்கள் செஃப் உங்கள் உணவை அன்புடன் தயாரித்து வருகிறார்.')}
-            </p>
-
-            {/* Details Box */}
-            <div className="os-meta">
-              <div className="os-meta-item">
-                <span className="os-meta-label">{translate('Order ID', 'ஆர்டர் ஐடி')}</span>
-                <span className="os-meta-value">{orderId}</span>
-              </div>
-              <div className="os-meta-item">
-                <span className="os-meta-label">{translate('Table', 'மேஜை')}</span>
-                <span className="os-meta-value">
-                  {formData.table || tableNumber || '06'} . {translate('Dine in', 'உண்ணுதல்')}
-                </span>
-              </div>
-              <div className="os-meta-item">
-                <span className="os-meta-label">{translate('Items', 'பொருட்கள்')}</span>
-                <span className="os-meta-value">{totalItemsCount}</span>
-              </div>
-              <div className="os-meta-item">
-                <span className="os-meta-label">{translate('Paid', 'செலுத்தப்பட்டது')}</span>
-                <span className="os-meta-value os-total">{isLoadingOrder ? "..." : `Rs. ${Number(displayTotal).toFixed(0)}`}</span>
-              </div>
-            </div>
-
-            {/* Estimated Time Badge */}
-            <div className="os-est-badge">
-              <i className="fa-regular fa-clock" />
-              <span>
-                {translate('Estimated Time · 15 - 20 min', 'மதிப்பிடப்பட்ட நேரம் · 15 - 20 நிமிடம்')}
-              </span>
-            </div>
-
-            {/* Track Order Button */}
-            <button className="os-track-btn" onClick={() => setIsTrackMode(true)}>
-              {translate('Track Order', 'ஆர்டரைக் கண்காணிக்கவும்')}
+            
+            <button className="new-os-track-btn" onClick={() => setIsTrackMode(true)}>
+              {translate('Track Order Status', 'ஆர்டர் நிலையை கண்காணிக்கவும்')} <i className="fa-solid fa-arrow-right"></i>
             </button>
           </div>
         ) : (
-          /* SCREENS 2, 3, 4: LIVE ORDER TRACKING */
-          <div className="os-card os-track-container">
-            <h2 className="os-track-title">{translate('Track Order', 'ஆர்டரைக் கண்காணிக்கவும்')}</h2>
-
-            {/* Live Status Card */}
-            <div className="os-live-status-card">
-              <div className="os-card-header">
-                <span className="os-card-order-id">{translate('Order ID', 'ஆர்டர் ஐடி')}: {orderId}</span>
-                <span className="os-live-badge">
-                  <span className="os-live-dot" style={{ width: '6px', height: '6px', background: '#fff', borderRadius: '50%' }} />
-                  {translate('Live', 'நேரடி')}
-                </span>
-              </div>
-              <div className="os-card-body">
-                <h3 className="os-status-headline">{getStatusHeadline()}</h3>
-                <p className="os-status-subline">{getStatusSubline()}</p>
-              </div>
-              <div className="os-progress-container">
-                <div className="os-progress-bar" style={{ width: getProgressBarWidth() }} />
-              </div>
-            </div>
-
-            {/* Stepper Timeline */}
-            <div className="os-timeline">
-              <div className="os-timeline-connector" style={{ height: getConnectorHeight() }} />
-
-              {/* Step 1: Order Received */}
-              <div className={`os-timeline-step ${trackStep >= 1 ? 'completed' : ''}`}>
-                <div className="os-step-icon">
-                  <i className="fa-solid fa-check" />
-                </div>
-                <div className="os-step-details">
-                  <span className="os-step-title">{translate('Order Received', 'ஆர்டர் பெறப்பட்டது')}</span>
-                  <span className="os-step-desc">{translate("We've got your order", 'ஆர்டரைப் பெற்றுக்கொண்டோம்')}</span>
-                </div>
-              </div>
-
-              {/* Step 2: Preparing */}
-              <div className={`os-timeline-step ${trackStep > 2 ? 'completed' : trackStep === 2 ? 'active' : ''}`}>
-                <div className="os-step-icon">
-                  <i className="fa-solid fa-utensils" />
-                </div>
-                <div className="os-step-details">
-                  <span className="os-step-title">{translate('Preparing', 'தயாரிக்கப்படுகிறது')}</span>
-                  <span className="os-step-desc">{translate('Chef is cooking your meal', 'செஃப் உணவைத் தயாரிக்கிறார்')}</span>
-                </div>
-              </div>
-
-              {/* Step 3: Ready to Serve */}
-              <div className={`os-timeline-step ${trackStep > 3 ? 'completed' : trackStep === 3 ? 'active' : ''}`}>
-                <div className="os-step-icon">
-                  <i className="fa-solid fa-bell" />
-                </div>
-                <div className="os-step-details">
-                  <span className="os-step-title">{translate('Ready to Serve', 'பரிமாற தயார்')}</span>
-                  <span className="os-step-desc">{translate('Plating up now', 'இப்போது தட்டுகளில் வைக்கப்படுகிறது')}</span>
-                </div>
-              </div>
-
-              {/* Step 4: Served at Table */}
-              <div className={`os-timeline-step ${trackStep === 4 ? 'active' : ''}`}>
-                <div className="os-step-icon">
-                  <i className="fa-solid fa-bowl-food" />
-                </div>
-                <div className="os-step-details">
-                  <span className="os-step-title">{translate('Served at Table', 'மேஜையில் பரிமாறப்பட்டது')}</span>
-                  <span className="os-step-desc">{translate('Enjoy your meal!', 'உங்கள் உணவை சுவையுங்கள்!')}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Order Summary Box */}
-            {displayCartData.length > 0 && (
-              <div className="os-summary-card">
-                <h4 className="os-summary-title">{translate('Your Order', 'உங்கள் ஆர்டர்')}</h4>
-                {displayCartData.map(item => (
-                  <div key={item.id} className="os-summary-row">
-                    <span>{item.quantity} x {item.name}</span>
-                    <span>Rs. {item.price * item.quantity}</span>
-                  </div>
-                ))}
-                <div className="os-summary-total">
-                  <span>{translate('Total :', 'மொத்தம் :')}</span>
-                  <span>Rs. {Number(displayTotal).toFixed(0)}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="os-track-actions">
-              <button className="os-btn-call" onClick={handleCallStaff} style={{ width: '100%' }}>
-                <i className="fa-solid fa-bell" /> {translate('Call Staff', 'ஊழியரை அழைக்கவும்')}
+          /* SCREENS 2, 3, 4: LIVE TRACKING */
+          <div className="os-card live-track-card">
+            <div className="live-track-header">
+              <button className="new-os-back" onClick={() => setIsTrackMode(false)} style={{ marginBottom: 0 }}>
+                <i className="fa-solid fa-arrow-left"></i> {translate('Back', 'பின்னே')}
               </button>
-              {/* Order More button removed until order is completed */}
+              <span className="live-track-order-id">{translate('Order', 'ஆர்டர்')} #{orderId.replace('ORD-', '').replace(/^0+/, '')}</span>
+            </div>
+            
+            <h1 className="live-track-title">{translate('Live Preparation Status', 'நேரடி தயாரிப்பு நிலை')}</h1>
+
+            <div className="live-track-grid">
+              {/* Left Column - Stepper */}
+              <div className="live-track-stepper">
+                {/* Step 1: Order Received */}
+                <div className={`lt-step ${trackStep >= 1 ? 'completed' : 'active'}`}>
+                  <div className="lt-icon"><i className="fa-solid fa-check"></i></div>
+                  <div className="lt-content">
+                    <h4>{translate('Order Received', 'ஆர்டர் பெறப்பட்டது')}</h4>
+                    <p>{translate('Confirmed by the desk', 'உறுதி செய்யப்பட்டது')}</p>
+                  </div>
+                </div>
+
+                {/* Step 2: Preparing */}
+                <div className={`lt-step ${trackStep > 2 ? 'completed' : trackStep === 2 ? 'active' : ''}`}>
+                  <div className="lt-icon">{trackStep > 2 ? <i className="fa-solid fa-check"></i> : trackStep === 2 ? <div className="lt-dot"></div> : null}</div>
+                  <div className="lt-content">
+                    <h4>
+                      {translate('Preparing Your Food', 'உணவு தயாராகிறது')} 
+                      {trackStep === 2 && <span className="lt-badge">COOKING</span>}
+                    </h4>
+                    <p>{translate('Chef is crafting your fresh South Indian dishes', 'செஃப் உணவை தயார் செய்கிறார்')}</p>
+                  </div>
+                </div>
+
+                {/* Step 3: Ready to Serve */}
+                <div className={`lt-step ${trackStep > 3 ? 'completed' : trackStep === 3 ? 'active' : ''}`}>
+                  <div className="lt-icon">{trackStep > 3 ? <i className="fa-solid fa-check"></i> : trackStep === 3 ? <div className="lt-dot"></div> : null}</div>
+                  <div className="lt-content">
+                    <h4>{translate('Ready to Serve', 'பரிமாற தயார்')}</h4>
+                    <p>{translate('Your food is plated and ready', 'உங்கள் உணவு தயாராக உள்ளது')}</p>
+                  </div>
+                </div>
+
+                {/* Step 4: Served at Table */}
+                <div className={`lt-step ${trackStep === 4 ? 'active' : ''}`}>
+                  <div className="lt-icon">{trackStep === 4 ? <div className="lt-dot"></div> : null}</div>
+                  <div className="lt-content">
+                    <h4>{translate('Served at Table', 'பரிமாறப்பட்டது')}</h4>
+                    <p>{translate('Enjoy your meal!', 'உங்கள் உணவை சுவையுங்கள்!')}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column - Timer */}
+              <div className="live-track-timer-box">
+                <div className="lt-timer-circle">
+                   <span className="lt-time">{trackStep === 4 ? '0' : trackStep === 3 ? '1' : trackStep === 2 ? '12' : '15'}</span>
+                   <span className="lt-unit">MINS LEFT</span>
+                </div>
+                <h4>{trackStep >= 3 ? translate('Almost there!', 'கிட்டத்தட்ட தயார்!') : translate('Cooking in progress', 'சமையல் நடக்கிறது')}</h4>
+                <p>{translate('Prep is running on schedule', 'தயாரிப்பு அட்டவணைப்படி நடக்கிறது')}</p>
+              </div>
+            </div>
+
+            <div className="live-track-footer">
+              <p>{translate('Please stay near your table. We will notify you when it\'s ready.', 'தயவுசெய்து உங்கள் மேஜைக்கு அருகில் இருக்கவும்.')}</p>
+              <button className="new-os-back" onClick={handleCallStaff} style={{ color: '#ff4e00', marginBottom: 0, fontWeight: 700 }}>
+                <i className="fa-regular fa-comment"></i> {translate('Need Help?', 'உதவி தேவையா?')}
+              </button>
             </div>
           </div>
         )}

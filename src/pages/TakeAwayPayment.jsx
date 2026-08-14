@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import Header from '../components/Header';
 import { useCart } from '../context/CartContext';
-
+import { useVoiceAgent } from '../context/VoiceAgentContext';
 import '../styles/payment.css';
 
 const TakeAwayPayment = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { agentState, setOrderPlaced, startOrderTracking, setFlowStage } = useVoiceAgent();
   const {
     cart,
     changeQty,
@@ -27,8 +28,8 @@ const TakeAwayPayment = () => {
 
   const { formData: rawFormData = {}, autoConfirmMethod } = location.state || {};
   const formData = {
-    name: rawFormData.name || sessionStorage.getItem('customer_name') || '',
-    phone: rawFormData.phone || sessionStorage.getItem('customer_phone') || ''
+    name:  agentState?.customerName  || rawFormData.name  || sessionStorage.getItem('customer_name')  || '',
+    phone: agentState?.mobileNumber  || rawFormData.phone || sessionStorage.getItem('customer_phone') || ''
   };
 
   useEffect(() => {
@@ -74,9 +75,20 @@ const TakeAwayPayment = () => {
     };
   }, []);
 
+  const isSubmittingRef = useRef(false);
+
   const handleConfirm = async (methodOverride) => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    
     const methodToUse = typeof methodOverride === 'string' ? methodOverride : selectedMethod;
     setIsCartOpen(false);
+    
+    if (cart.length === 0) {
+      console.warn("Cannot place order: cart is empty");
+      isSubmittingRef.current = false;
+      return;
+    }
 
     if (methodToUse === 'Cash') {
       const orderData = {
@@ -96,7 +108,8 @@ const TakeAwayPayment = () => {
       };
 
       try {
-        const res = await fetch(`/api/orders`, {
+        const selectedRestaurantId = localStorage.getItem('selected_restaurant_id') || '1';
+        const res = await fetch(`/api/orders?restaurant_id=${selectedRestaurantId}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(orderData)
@@ -147,7 +160,8 @@ const TakeAwayPayment = () => {
     };
 
     try {
-      const orderRes = await fetch(`/api/orders`, {
+      const selectedRestaurantId = localStorage.getItem('selected_restaurant_id') || '1';
+      const orderRes = await fetch(`/api/orders?restaurant_id=${selectedRestaurantId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderData)
@@ -196,15 +210,8 @@ const TakeAwayPayment = () => {
       }
 
       if (!razorpayKeyId || !rzpOrder.success) {
-        console.warn('Razorpay configuration or order creation failed. Completing payment directly.');
-        sessionStorage.setItem('chatbot_flow_stage', 'payment_done');
-        navigate('/takeaway-order-success', {
-          state: {
-            orderId: generatedOrderId,
-            cartData: cart,
-            subtotal, gst, total, formData, paymentMethod: 'UPI'
-          }
-        });
+        console.warn('Razorpay configuration or order creation failed. Redirecting to payment failed page.');
+        navigate('/payment-failed', { state: { total, isTakeAway: true, formData, cart } });
         return;
       }
 

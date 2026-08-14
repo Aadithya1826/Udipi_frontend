@@ -14,6 +14,7 @@ import TakeAwayPayment from './pages/TakeAwayPayment'
 import TakeAwayOrderSuccess from './pages/TakeAwayOrderSuccess'
 import Checkout from './pages/Checkout'
 import { CartProvider } from './context/CartContext'
+import { VoiceAgentProvider } from './context/VoiceAgentContext'
 import AIAssistantOverlay from './components/AIAssistantOverlay'
 import ActiveOrderGuard from './components/ActiveOrderGuard'
 import ActiveOrderBanner from './components/ActiveOrderBanner'
@@ -45,30 +46,32 @@ function ActiveOrderRedirector() {
 function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <CartProvider>
-        <ActiveOrderRedirector />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/agent" element={<Agent />} />
-          <Route path="/dine-in" element={<DineIn />} />
-          <Route path="/take-away" element={<TakeAway />} />
-          <Route path="/invoice" element={<Invoice />} />
+      <VoiceAgentProvider>
+        <CartProvider>
+          <ActiveOrderRedirector />
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/agent" element={<Agent />} />
+            <Route path="/dine-in" element={<DineIn />} />
+            <Route path="/take-away" element={<TakeAway />} />
+            <Route path="/invoice" element={<Invoice />} />
+          <Route path="/checkout" element={<ActiveOrderGuard><Checkout isTakeaway={false} /></ActiveOrderGuard>} />
+          <Route path="/payment" element={<ActiveOrderGuard><Payment /></ActiveOrderGuard>} />
+          <Route path="/order-success" element={<OrderSuccess />} />
+          <Route path="/payment-failed" element={<PaymentFailed />} />
 
-        <Route path="/checkout" element={<ActiveOrderGuard><Checkout isTakeaway={false} /></ActiveOrderGuard>} />
-        <Route path="/payment" element={<ActiveOrderGuard><Payment /></ActiveOrderGuard>} />
-        <Route path="/order-success" element={<OrderSuccess />} />
-        <Route path="/payment-failed" element={<PaymentFailed />} />
-
-        <Route path="/takeaway-checkout" element={<ActiveOrderGuard><Checkout isTakeaway={true} /></ActiveOrderGuard>} />
-        <Route path="/takeaway-payment" element={<ActiveOrderGuard><TakeAwayPayment /></ActiveOrderGuard>} />
-        <Route path="/takeaway-order-success" element={<TakeAwayOrderSuccess />} />
-      </Routes>
-      <ActiveOrderBanner />
-      <AIAssistantOverlay />
-      </CartProvider>
+          <Route path="/takeaway-checkout" element={<ActiveOrderGuard><Checkout isTakeaway={true} /></ActiveOrderGuard>} />
+          <Route path="/takeaway-payment" element={<ActiveOrderGuard><TakeAwayPayment /></ActiveOrderGuard>} />
+          <Route path="/takeaway-order-success" element={<TakeAwayOrderSuccess />} />
+        </Routes>
+        <ActiveOrderBanner />
+        <AIAssistantOverlay />
+        </CartProvider>
+      </VoiceAgentProvider>
     </Router>
   )
 }
+
 
 export default App
 

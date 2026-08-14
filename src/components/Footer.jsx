@@ -1,7 +1,7 @@
 import React from 'react'
 import { useLanguage } from '../context/LanguageContext'
 import '../styles/components.css'
-import chefMascotImg from '../assets/images/chef_mascot.png'
+const chefMascotImg = `${import.meta.env.VITE_API_URL}/static/assets/images/chef_mascot.png`;
 
 function Footer() {
   const { t } = useLanguage()

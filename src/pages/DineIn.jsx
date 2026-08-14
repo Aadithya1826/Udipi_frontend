@@ -1,24 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Html5Qrcode } from 'html5-qrcode'
 import { useLanguage } from '../context/LanguageContext'
 import { useCart } from '../context/CartContext'
+import { useVoiceAgent } from '../context/VoiceAgentContext'
 import Header from '../components/Header'
-// Menu data is fetched directly below
 import '../styles/pages.css'
 import '../styles/dinein.css'
 import '../styles/home.css'
-
-if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia && !navigator.mediaDevices.getUserMedia.isPatched) {
-  const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-  navigator.mediaDevices.getUserMedia = async (constraints) => {
-    const stream = await originalGetUserMedia(constraints);
-    window.activeCameraStreams = window.activeCameraStreams || new Set();
-    window.activeCameraStreams.add(stream);
-    return stream;
-  };
-  navigator.mediaDevices.getUserMedia.isPatched = true;
-}
 
 function MenuCard({ item, qty, onAdd, onInc, onDec, onUpdateQty, hasActiveOrder }) {
   const { t, language } = useLanguage()
@@ -42,7 +30,6 @@ function MenuCard({ item, qty, onAdd, onInc, onDec, onUpdateQty, hasActiveOrder 
 
       <div className="fg-card-content">
         <h3 className="fg-card-title">
-          {item.itemCode && <span className="item-code-badge">[{item.itemCode}] </span>}
           {language === 'Tamil' && item.tamilName ? item.tamilName : item.name}
         </h3>
         <p className="fg-card-desc">{language === 'Tamil' && item.tamilDesc ? item.tamilDesc : item.description}</p>
@@ -119,6 +106,7 @@ export default function DineIn() {
   const navigate = useNavigate()
   const location = useLocation()
   const { t, language } = useLanguage()
+  const { isAgentOpen } = useVoiceAgent()
   const {
     cart,
     setCart,
@@ -142,7 +130,8 @@ export default function DineIn() {
   const [topHeight] = useState(100)
   const [cardScale] = useState(1.0)
 
-  const [menuCategories, setMenuCategories] = useState([{ id: 'all', name: 'All Menu', image: null }])
+  const [activeRegion, setActiveRegion] = useState('all')
+  const [menuCategories, setMenuCategories] = useState([{ id: 'all', name: 'All', image: null, region: 'all' }])
   const [menuItems, setMenuItems] = useState({ all: [] })
   const [loading, setLoading] = useState(true)
 
@@ -152,63 +141,20 @@ export default function DineIn() {
   const [sortOption, setSortOption] = useState('default')
   const filterDropdownRef = useRef(null)
 
-  const [showScanner, setShowScanner] = useState(false)
-  const [manualTable, setManualTable] = useState('')
-  const [scannerError, setScannerError] = useState('')
-  const qrCodeInstanceRef = useRef(null)
-
-  const stopAllCameraTracks = () => {
-    if (window.activeCameraStreams) {
-      window.activeCameraStreams.forEach(stream => {
-        stream.getTracks().forEach(track => track.stop());
-      });
-      window.activeCameraStreams.clear();
-    }
-    try {
-      const videos = document.querySelectorAll('video')
-      videos.forEach(video => {
-        if (video.srcObject && typeof video.srcObject.getTracks === 'function') {
-          video.srcObject.getTracks().forEach(track => {
-            track.stop()
-          })
-          video.srcObject = null
-        }
-      })
-    } catch (e) {
-      console.error("Error manually stopping camera tracks:", e)
-    }
-  }
-
-  const handleCloseScanner = async () => {
-    stopAllCameraTracks()
-    if (qrCodeInstanceRef.current) {
-      try {
-        if (qrCodeInstanceRef.current.isScanning) {
-          await qrCodeInstanceRef.current.stop()
-        }
-        await qrCodeInstanceRef.current.clear()
-      } catch (err) {
-        console.error("Error stopping scanner on close:", err)
+  useEffect(() => {
+    if (activeRegion !== 'all') {
+      const validCats = menuCategories.filter(c => c.region === 'all' || c.region === activeRegion);
+      if (!validCats.find(c => c.id === activeCategory)) {
+        setActiveCategory('all');
       }
-      qrCodeInstanceRef.current = null
     }
-    setShowScanner(false)
-  }
+  }, [activeRegion, menuCategories, activeCategory, setActiveCategory]);
 
-  const parseTableFromQR = (data) => {
-    try {
-      if (data.includes('?')) {
-        const queryString = data.split('?')[1]
-        const params = new URLSearchParams(queryString)
-        const tableVal = params.get('table')
-        if (tableVal) {
-          return formatTableNumber(tableVal)
-        }
-      }
-    } catch (e) {
-      console.error("Error parsing QR URL:", e)
-    }
-    return formatTableNumber(data)
+  const [showTableModal, setShowTableModal] = useState(false)
+  const [tableInput, setTableInput] = useState('')
+
+  const handleCloseModal = () => {
+    setShowTableModal(false)
   }
 
   const formatTableNumber = (val) => {
@@ -226,144 +172,99 @@ export default function DineIn() {
     return '06'
   }
 
-  const handleScanSuccess = async (decodedText) => {
-    stopAllCameraTracks()
-    if (qrCodeInstanceRef.current) {
-      try {
-        if (qrCodeInstanceRef.current.isScanning) {
-          await qrCodeInstanceRef.current.stop()
-        }
-        await qrCodeInstanceRef.current.clear()
-      } catch (err) {
-        console.error("Error stopping scanner on success:", err)
-      }
-      qrCodeInstanceRef.current = null
-    }
-    const tableNum = parseTableFromQR(decodedText)
-    setTableNumber(tableNum)
-    localStorage.setItem('active_table_number', tableNum)
-    setShowScanner(false)
-  }
-
-  const handleManualSubmit = async () => {
-    if (!manualTable.trim()) {
+  const handleSubmitTable = async () => {
+    if (!tableInput.trim()) {
       alert("Please enter a valid table number.")
       return
     }
-    stopAllCameraTracks()
-    if (qrCodeInstanceRef.current) {
-      try {
-        if (qrCodeInstanceRef.current.isScanning) {
-          await qrCodeInstanceRef.current.stop()
+    const tableNum = formatTableNumber(tableInput)
+    
+    try {
+      const restaurantId = localStorage.getItem('selected_restaurant_id') || '1';
+      const API_BASE = import.meta.env.VITE_API_URL || '';
+      const response = await fetch(`${API_BASE}/api/v1/public/tables/${tableNum}?restaurant_id=${restaurantId}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          alert("Table not found. Please enter a valid table number.");
+        } else {
+          alert("Error verifying table status. Please try again.");
         }
-        await qrCodeInstanceRef.current.clear()
-      } catch (err) {
-        console.error("Error stopping scanner on manual submit:", err)
+        return;
       }
-      qrCodeInstanceRef.current = null
+      
+      const data = await response.json();
+      if (data.is_active === false) {
+        alert("This table is currently inactive.");
+        return;
+      }
+      if (data.status.toLowerCase() !== 'vacant') {
+        alert(`This table is currently ${data.status}. Please select a vacant table.`);
+        return;
+      }
+      
+      setTableNumber(tableNum)
+      localStorage.setItem('active_table_number', tableNum)
+      setShowTableModal(false)
+      const pendingPayment = sessionStorage.getItem('pending_ai_payment')
+      if (pendingPayment) {
+        sessionStorage.removeItem('pending_ai_payment')
+        navigate('/payment', { state: { autoConfirmMethod: pendingPayment } })
+      }
+    } catch (error) {
+      console.error("Error verifying table:", error);
+      alert("Failed to verify table. Please check your connection.");
     }
-    const tableNum = formatTableNumber(manualTable)
-    setTableNumber(tableNum)
-    localStorage.setItem('active_table_number', tableNum)
-    setShowScanner(false)
   }
 
   useEffect(() => {
-    const handleOpenScanner = () => {
-      setShowScanner(true);
-      setScannerError('');
-      setManualTable('');
-    };
-    const handleCloseScannerEvent = () => {
-      handleCloseScanner();
+    const handleOpenTableModal = () => {
+      setShowTableModal(true);
+      setTableInput('');
     };
     const handleSimulateScan = (e) => {
       const tableNum = e.detail?.tableNumber || '06';
       setTableNumber(tableNum);
       localStorage.setItem('active_table_number', tableNum);
-      handleCloseScanner();
+      setShowTableModal(false);
     };
-    
-    document.addEventListener('open-qr-scanner', handleOpenScanner);
-    document.addEventListener('close-qr-scanner', handleCloseScannerEvent);
-    document.addEventListener('simulate-scan-success', handleSimulateScan);
-    
-    return () => {
-      document.removeEventListener('open-qr-scanner', handleOpenScanner);
-      document.removeEventListener('close-qr-scanner', handleCloseScannerEvent);
-      document.removeEventListener('simulate-scan-success', handleSimulateScan);
-    };
-  }, [setTableNumber]);
-
-  useEffect(() => {
-    let active = true
-    let html5QrCode = null
-
-    if (showScanner) {
-      const timer = setTimeout(() => {
-        if (!active) return
-
-        try {
-          html5QrCode = new Html5Qrcode("qr-reader")
-          qrCodeInstanceRef.current = html5QrCode
-
-          html5QrCode.start(
-            { facingMode: "environment" },
-            {
-              fps: 10,
-              qrbox: { width: 220, height: 220 }
-            },
-            (decodedText) => {
-              if (active) {
-                handleScanSuccess(decodedText)
-              }
-            },
-            () => { }
-          ).then(() => {
-            if (!active && html5QrCode) {
-              stopAllCameraTracks()
-              if (html5QrCode.isScanning) {
-                html5QrCode.stop()
-                  .then(() => {
-                    html5QrCode.clear()
-                  })
-                  .catch(err => console.error("Stop failed on late cleanup:", err))
-              } else {
-                stopAllCameraTracks()
-              }
-            }
-          }).catch((err) => {
-            if (active) {
-              console.error("Camera start error:", err)
-              setScannerError("Could not access camera. Please enter table number manually.")
-            }
-          })
-        } catch (e) {
-          console.error("Scanner setup error:", e)
-          setScannerError("Scanner initialization failed. Please use manual entry.")
-        }
-      }, 300)
-
-      return () => {
-        clearTimeout(timer)
-        active = false
-        stopAllCameraTracks()
-        if (html5QrCode) {
-          try {
-            if (html5QrCode.isScanning) {
-              html5QrCode.stop()
-                .then(() => {
-                  html5QrCode.clear()
-                })
-                .catch(err => console.error("Scanner stop error:", err))
-            }
-          } catch (e) {
-            console.error("Scanner cleanup error:", e)
-          }
+    const handleChangeCategory = (e) => {
+      const catId = e.detail?.categoryId;
+      if (catId) {
+        setActiveCategory(catId);
+        // Automatically switch region if it's North Indian
+        const catObj = menuCategories.find(c => String(c.id) === String(catId));
+        if (catObj) {
+          const isNorthIndian = (name) => {
+             const lower = name.toLowerCase();
+             return lower.includes('north indian') || lower.includes('tandoori') || lower.includes('noodles') || lower.includes('salad') || lower.includes('raitha') || lower.includes('soups');
+          };
+          setActiveRegion(isNorthIndian(catObj.name) ? 'north' : 'south');
         }
       }
-    }
-  }, [showScanner])
+    };
+
+    const handleChangeRegion = (e) => {
+      const region = e.detail?.region;
+      if (region) {
+        setActiveRegion(region);
+        setActiveCategory('all');
+      }
+    };
+    
+    document.addEventListener('open-table-modal', handleOpenTableModal);
+    document.addEventListener('simulate-scan-success', handleSimulateScan);
+    document.addEventListener('change-category', handleChangeCategory);
+    document.addEventListener('change-region', handleChangeRegion);
+    
+    return () => {
+      document.removeEventListener('open-table-modal', handleOpenTableModal);
+      document.removeEventListener('simulate-scan-success', handleSimulateScan);
+      document.removeEventListener('change-category', handleChangeCategory);
+      document.removeEventListener('change-region', handleChangeRegion);
+    };
+  }, [menuCategories, setActiveCategory, setActiveRegion]);
+
   useEffect(() => {
     function handleClickOutside(event) {
       if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target)) {
@@ -384,21 +285,40 @@ export default function DineIn() {
     // Fetch menu data from backend
     async function fetchMenuData() {
       try {
-        const catRes = await fetch('/api/v1/public/menu/categories');
+        const restaurantId = localStorage.getItem('selected_restaurant_id') || '1';
+        const API_BASE = import.meta.env.VITE_API_URL || '';
+        
+        const catRes = await fetch(`${API_BASE}/api/v1/public/menu/categories?restaurant_id=${restaurantId}`);
         const dbCategories = await catRes.json();
 
-        const itemRes = await fetch('/api/v1/public/menu/items');
+        const itemRes = await fetch(`${API_BASE}/api/v1/public/menu/items?restaurant_id=${restaurantId}`);
         const dbItems = await itemRes.json();
+
+        const cleanCategoryName = (name) => {
+          if (!name) return '';
+          let clean = name.trim();
+          clean = clean.replace(/\s*\(.*?\)\s*/g, ' ').trim();
+          return clean;
+        };
+
+        const isNorthIndian = (name) => {
+           const lower = name.toLowerCase();
+           return lower.includes('north indian') || lower.includes('tandoori') || lower.includes('noodles') || lower.includes('salad') || lower.includes('raitha') || lower.includes('soups');
+        };
 
         const catIdMap = {};
         const uniqueCategories = [];
         const seenNames = new Map();
 
         for (const cat of dbCategories) {
-          const normName = cat.name.trim().toLowerCase();
+          const cleanedName = cleanCategoryName(cat.name);
+          if (!cleanedName) continue;
+          if (cleanedName.includes('_')) continue;
+          
+          const normName = cleanedName.toLowerCase();
           if (!seenNames.has(normName)) {
             seenNames.set(normName, cat.id);
-            uniqueCategories.push(cat);
+            uniqueCategories.push({ ...cat, name: cleanedName });
             catIdMap[cat.id] = cat.id;
           } else {
             catIdMap[cat.id] = seenNames.get(normName);
@@ -406,18 +326,30 @@ export default function DineIn() {
         }
 
         const formattedCategories = [
-          { id: 'all', name: 'All Menu', image: null },
+          { id: 'all', name: 'All', image: null, region: 'all' },
           ...uniqueCategories.map(c => ({
             id: String(c.id),
             name: c.name,
-            image: c.image_url || null
+            image: c.image_url ? (c.image_url.startsWith('http') ? c.image_url : `http://dev-api.dataudipi.com${c.image_url}`) : null,
+            region: isNorthIndian(c.name) ? 'north' : 'south'
           }))
         ];
 
         const formattedItems = {};
         const allItems = [];
 
+        // Deduplicate items: keep only the highest ID for a given name
+        const uniqueItemsMap = new Map();
         dbItems.forEach(item => {
+          const normName = (item.name || '').trim().toLowerCase();
+          const existing = uniqueItemsMap.get(normName);
+          if (!existing || item.id > existing.id) {
+            uniqueItemsMap.set(normName, item);
+          }
+        });
+        const deduplicatedDbItems = Array.from(uniqueItemsMap.values());
+
+        deduplicatedDbItems.forEach(item => {
           const rawCatId = item.category_id;
           const catId = String(catIdMap[rawCatId] || rawCatId);
           const formattedItem = {
@@ -426,7 +358,7 @@ export default function DineIn() {
             name: item.name,
             tamilName: item.name, // Fallback to english if tamil not available
             price: Number(item.price),
-            image: item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `${import.meta.env.VITE_API_URL || ''}${item.image_url}`) : null,
+            image: item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `http://dev-api.dataudipi.com${item.image_url}`) : null,
             description: item.description,
             tamilDesc: item.description,
             available: item.is_available,
@@ -491,7 +423,7 @@ export default function DineIn() {
   const displayItems = (isMobile && !showAllItems) ? processedItems.slice(0, 6) : processedItems
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${isAgentOpen ? 'agent-open' : ''}`}>
       <div className="background-image" />
       <Header tableNumber={tableNumber} showFullHeader={true} useTitleImage={true} onTableClick={() => setShowScanner(true)} />
 
@@ -572,8 +504,19 @@ export default function DineIn() {
             </div>
           </div>
 
+          <div className="di-region-tabs-wrap">
+            <button className={`di-region-tab ${activeRegion === 'all' ? 'active' : ''}`} onClick={() => setActiveRegion('all')}>
+              All Regions
+            </button>
+            <button className={`di-region-tab ${activeRegion === 'south' ? 'active' : ''}`} onClick={() => setActiveRegion('south')}>
+              South Indian
+            </button>
+            <button className={`di-region-tab ${activeRegion === 'north' ? 'active' : ''}`} onClick={() => setActiveRegion('north')}>
+              North Indian
+            </button>
+          </div>
           <div className="di-tabs-wrap">
-            {menuCategories.map(cat => (
+            {menuCategories.filter(cat => activeRegion === 'all' || cat.region === 'all' || cat.region === activeRegion).map(cat => (
               <button key={cat.id} className={`di-tab ${activeCategory === cat.id ? 'active' : ''}`} onClick={() => setActiveCategory(cat.id)}>
                 {cat.image && <img src={cat.image} alt={t(cat.name)} className="di-tab-img" onError={e => { e.target.onerror = null; e.target.style.display = 'none'; }} />}
                 <span>{language === 'Tamil' && cat.tamilName ? cat.tamilName : t(cat.name)}</span>
@@ -645,7 +588,7 @@ export default function DineIn() {
           <div className="di-cart-header">
             <div className="di-cart-header-left">
               <span className="di-cart-title">{t('cart') || 'Cart'}</span>
-              <span className="di-cart-table-pill" onClick={() => setShowScanner(true)} style={{ cursor: 'pointer' }}>{t('tableNo')} {tableNumber} <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
+              <span className="di-cart-table-pill" onClick={() => setShowTableModal(true)} style={{ cursor: 'pointer' }}>{t('tableNo')} {tableNumber} <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
             </div>
             <button className="di-cart-close" onClick={() => setIsCartOpen(false)}>✕</button>
           </div>
@@ -733,43 +676,44 @@ export default function DineIn() {
 
 
 
-      {showScanner && (
+      {showTableModal && (
         <div className="scanner-modal-overlay" style={{ zIndex: 10000 }}>
-          <div className="scanner-modal-content">
-            <button className="scanner-modal-close" onClick={handleCloseScanner}>
+          <div className="scanner-modal-content" style={{ maxWidth: '400px', padding: '2rem' }}>
+            <button className="scanner-modal-close" onClick={handleCloseModal}>
               <i className="fa-solid fa-xmark"></i>
             </button>
-            <h4 className="scanner-modal-title">Change the table number</h4>
-            <p className="scanner-modal-subtitle">Align the QR code on your table to change table</p>
+            <h4 className="scanner-modal-title" style={{ marginBottom: '1rem' }}>Enter Table Number</h4>
+            <p className="scanner-modal-subtitle">Please enter the table number where you wish to be seated.</p>
 
-            <div className="qr-reader-container">
-              <div id="qr-reader"></div>
-              <div className="qr-scanner-viewfinder">
-                <div className="viewfinder-box">
-                  <div className="scan-laser"></div>
-                </div>
-              </div>
+            <div className="manual-input-group" style={{ marginBottom: '2rem' }}>
+              <input
+                type="text"
+                className="manual-table-input"
+                placeholder="Table No. (e.g. 05)"
+                value={tableInput}
+                onChange={(e) => setTableInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSubmitTable()}
+                style={{ width: '100%', marginBottom: '1rem', padding: '12px', fontSize: '1.2rem', textAlign: 'center', border: '1px solid #ccc', borderRadius: '8px' }}
+              />
             </div>
-
-            {scannerError && (
-              <div className="scanner-error-msg">{scannerError}</div>
-            )}
-
-            <div className="scanner-manual-card">
-              <h5 className="manual-card-title">Unable to scan?</h5>
-              <p className="manual-card-subtitle">Enter the table number manually from your table card</p>
-              <div className="manual-input-group">
-                <input
-                  type="text"
-                  className="manual-table-input"
-                  placeholder="Table No. (e.g. 05)"
-                  value={manualTable}
-                  onChange={(e) => setManualTable(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
-                />
-                <button className="manual-table-btn" onClick={handleManualSubmit}>Submit</button>
-              </div>
-            </div>
+            
+            <button 
+              onClick={handleSubmitTable}
+              style={{
+                width: '100%',
+                background: 'linear-gradient(135deg, #FF6B00 0%, #FF3D00 100%)',
+                color: 'white',
+                border: 'none',
+                padding: '14px 20px',
+                borderRadius: '50px',
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 4px 15px rgba(255, 107, 0, 0.3)'
+              }}
+            >
+              Confirm Table
+            </button>
           </div>
         </div>
       )}

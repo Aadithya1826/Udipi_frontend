@@ -32,9 +32,20 @@ const ActiveOrderBanner = () => {
       if (!activeOrderId) return;
       setIsValidating(true);
       try {
-        const res = await fetch(`/api/orders/${activeOrderId}`);
+        const selectedRestaurantId = localStorage.getItem('selected_restaurant_id') || '1';
+        const res = await fetch(`/api/orders/${activeOrderId}?restaurant_id=${selectedRestaurantId}`);
         if (!res.ok) {
-          if (isMounted) setIsOrderValid(false);
+          if (res.status === 404 || res.status === 500) {
+            localStorage.removeItem('active_order_id');
+            localStorage.removeItem('active_order_type');
+            localStorage.removeItem('active_table_number');
+            if (isMounted) {
+              setIsOrderValid(false);
+              setActiveOrderId(null);
+            }
+          } else {
+            if (isMounted) setIsOrderValid(false);
+          }
           return;
         }
         const data = await res.json();
@@ -75,34 +86,61 @@ const ActiveOrderBanner = () => {
   };
 
   return (
-    <div style={{
+    <div className="active-order-corner-widget" onClick={handleTrackClick} style={{
       position: 'fixed',
-      bottom: '100px', // Above the AIAssistant bubble and mobile navigation
-      left: '50%',
-      transform: 'translateX(-50%)',
-      backgroundColor: '#ff4e00',
-      color: 'white',
-      padding: '12px 24px',
-      borderRadius: '50px',
-      boxShadow: '0 4px 15px rgba(255, 78, 0, 0.4)',
+      top: '100px',
+      right: '20px',
+      backgroundColor: '#fff',
+      border: '2px solid #ff4e00',
+      borderRadius: '12px',
+      boxShadow: '0 8px 25px rgba(255,78,0,0.25)',
+      padding: '12px 16px',
       display: 'flex',
-      alignItems: 'center',
-      gap: '15px',
+      flexDirection: 'column',
+      gap: '8px',
       zIndex: 9999,
       cursor: 'pointer',
-      fontWeight: 'bold',
-      fontFamily: 'inherit'
-    }} onClick={handleTrackClick}>
-      <span><i className="fa-solid fa-bell"></i> You have an active order ({activeOrderId})</span>
-      <button style={{
-        background: 'white',
-        color: '#ff4e00',
-        border: 'none',
-        padding: '6px 12px',
-        borderRadius: '20px',
-        fontWeight: 'bold',
-        cursor: 'pointer'
-      }}>Track</button>
+      minWidth: '220px',
+      animation: 'slideInRight 0.5s ease-out'
+    }}>
+      <style>
+        {`
+          @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+          }
+          .active-order-corner-widget:hover {
+            transform: translateY(-2px);
+            boxShadow: 0 10px 30px rgba(255,78,0,0.3);
+          }
+        `}
+      </style>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#666', textTransform: 'uppercase', letterSpacing: '1px' }}>
+          <i className="fa-solid fa-circle" style={{ color: '#00c853', fontSize: '8px', marginRight: '6px', animation: 'pulse 2s infinite' }}></i>
+          Live Order
+        </span>
+        <span style={{ fontSize: '12px', color: '#999', fontWeight: 'bold' }}>#{activeOrderId.replace('ORD-', '').replace(/^0+/, '')}</span>
+      </div>
+      
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
+        <span style={{ fontWeight: 'bold', color: '#333', fontSize: '15px' }}>
+          Track Status
+        </span>
+        <div style={{
+          backgroundColor: '#ff4e00',
+          color: 'white',
+          width: '28px',
+          height: '28px',
+          borderRadius: '50%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '12px'
+        }}>
+          <i className="fa-solid fa-arrow-right"></i>
+        </div>
+      </div>
     </div>
   );
 };

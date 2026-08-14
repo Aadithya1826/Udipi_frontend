@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
 import '../styles/components.css'
-import dataudipiTitleImg from '../assets/images/Dataudupi-Title.png'
-import udupiBannerImg from '../assets/images/udupi-banner.png'
+const dataudipiTitleImg = `${import.meta.env.VITE_API_URL}/static/assets/images/Dataudupi-Title.png`;
+const udupiBannerImg = `${import.meta.env.VITE_API_URL}/static/assets/images/udupi-banner.png`;
 
-function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = false, showDateTime = true, hideTableIndicator = false, onTableClick }) {
+function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = false, showDateTime = true, hideTableIndicator = false, onTableClick, showBranchSelector = false, children }) {
   const navigate = useNavigate()
   const { language, setLanguage, t } = useLanguage()
   const [showLangDropdown, setShowLangDropdown] = useState(false)
@@ -48,8 +48,8 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
 
   return (
     <header className={`header ${showFullHeader ? 'full-header' : ''}`}>
-      {/* Table Indicator */}
-      {!hideTableIndicator && (
+      {/* Table Indicator or Branch Selector */}
+      {!hideTableIndicator ? (
         <div
           className="table-indicator"
           onClick={onTableClick}
@@ -58,7 +58,27 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
           <span className="table-text">{t('tableNo')}</span>
           <div className="table-number">{tableNumber}</div>
         </div>
-      )}
+      ) : showBranchSelector ? (
+        <div className="header-branch-selector">
+          <span className="branch-label">Branch:</span>
+          <select
+            value={localStorage.getItem('selected_restaurant_id') || '1'}
+            onChange={(e) => {
+              const val = e.target.value;
+              const name = val === '1' ? 'Data Udipi — Mugalivakkam' : 'Data Udipi — MGR Nagar';
+              localStorage.setItem('selected_restaurant_id', val);
+              localStorage.setItem('selected_restaurant_name', name);
+              sessionStorage.removeItem('udipi_carts_session_v1'); // Clear cart on branch change
+              window.dispatchEvent(new Event('storage'));
+              window.location.reload();
+            }}
+            className="branch-select"
+          >
+            <option value="1">Mugalivakkam</option>
+            <option value="2">MGR Nagar</option>
+          </select>
+        </div>
+      ) : null}
 
       {/* Logo Sign */}
       <div 
@@ -113,6 +133,7 @@ function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = fa
               </div>
             )}
           </div>
+          {children}
         </div>
       </div>
     </header>

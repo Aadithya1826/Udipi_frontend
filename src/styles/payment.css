@@ -13,7 +13,7 @@
 .payment-bg {
   position: fixed;
   inset: 0;
-  background: url('../assets/images/restaurant_bg.png') center / cover no-repeat;
+  background: var(--restaurant-bg) center / cover no-repeat;
   filter: blur(4px) brightness(0.55);
   z-index: 0;
   transform: scale(1.05);
