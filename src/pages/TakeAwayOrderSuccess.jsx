@@ -4,6 +4,7 @@ import Header from '../components/Header';
 import AIAssistantOverlay from '../components/AIAssistantOverlay';
 import { useCart } from '../context/CartContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useVoiceAgent } from '../context/VoiceAgentContext';
 import '../styles/ordersuccess.css';
 
 const TakeAwayOrderSuccess = () => {
@@ -11,6 +12,7 @@ const TakeAwayOrderSuccess = () => {
   const navigate = useNavigate();
   const { clearCart } = useCart();
   const { language } = useLanguage();
+  const { resetJourney } = useVoiceAgent();
   const {
     cartData = [],
     subtotal = 0,
@@ -137,6 +139,7 @@ const TakeAwayOrderSuccess = () => {
       sessionStorage.removeItem('ai_has_greeted');
       sessionStorage.removeItem('chatbot_flow_stage');
       sessionStorage.removeItem('last_placed_order_id');
+      resetJourney();
     }
   }, [dbStatus]);
 
@@ -226,6 +229,7 @@ const TakeAwayOrderSuccess = () => {
               <button className="os-home-btn" onClick={() => {
                 sessionStorage.removeItem('chatbot_flow_stage');
                 sessionStorage.removeItem('last_placed_order_id');
+                resetJourney();
                 navigate('/');
               }}>
                 <i className="fa-solid fa-house" /> {translate('Back to Home', 'முகப்பு')}
@@ -250,7 +254,10 @@ const TakeAwayOrderSuccess = () => {
         ) : !isTrackMode ? (
           /* SCREEN 1: TAKEAWAY ORDER SUCCESS CONFIRMATION */
           <div className="os-card new-os-card">
-            <button className="new-os-back" onClick={() => navigate('/')}>
+            <button className="new-os-back" onClick={() => {
+              resetJourney();
+              navigate('/');
+            }}>
               <i className="fa-solid fa-arrow-left"></i> {translate('Back to Menu', 'மெனுவுக்கு திரும்பு')}
             </button>
             <h1 className="new-os-title">{translate('Order Placed Successfully!', 'ஆர்டர் வெற்றிகரமாக செய்யப்பட்டது!')}</h1>

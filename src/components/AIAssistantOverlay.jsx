@@ -303,7 +303,7 @@ const AIAssistantOverlay = () => {
           silenceTimerRef.current = setTimeout(() => {
             shouldSubmitRef.current = true;
             recognition.stop();
-          }, 2500); // 2500ms silence threshold allows users to pause and think
+          }, SILENCE_TIMEOUT); // Use configured SILENCE_TIMEOUT for snappier responses
         }
       };
 
