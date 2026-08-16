@@ -31,6 +31,7 @@ const TakeAwayOrderSuccess = () => {
   const [fetchedOrder, setFetchedOrder] = useState(null);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [redirectCountdown, setRedirectCountdown] = useState(5);
 
   // Clear cart & lock back navigation on mount
   useEffect(() => {
@@ -59,6 +60,27 @@ const TakeAwayOrderSuccess = () => {
       setIsFinalScreen(true);
     }
   }, [trackStep]);
+
+  // Auto-redirect to Home page when order is completed
+  useEffect(() => {
+    if (!isFinalScreen) return;
+
+    const timer = setInterval(() => {
+      setRedirectCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          sessionStorage.removeItem('chatbot_flow_stage');
+          sessionStorage.removeItem('last_placed_order_id');
+          resetJourney();
+          navigate('/', { replace: true });
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isFinalScreen, navigate, resetJourney]);
 
   const localActiveId = localStorage.getItem('active_order_id');
   const lastSessionId = sessionStorage.getItem('last_placed_order_id');
@@ -221,8 +243,12 @@ const TakeAwayOrderSuccess = () => {
             <h1 className="os-title" style={{ fontSize: '36px', marginBottom: '12px' }}>
               {translate('Thank You!', 'நன்றி!')}
             </h1>
-            <p className="os-subtitle" style={{ fontSize: '18px', color: '#555', marginBottom: '36px' }}>
+            <p className="os-subtitle" style={{ fontSize: '18px', color: '#555', marginBottom: '12px' }}>
               {translate('Visit again!', 'மீண்டும் வருக!')}
+            </p>
+            <p className="os-redirect-notice" style={{ fontSize: '15px', color: '#ff4e00', marginBottom: '32px', fontWeight: '600' }}>
+              <i className="fa-solid fa-spinner fa-spin" style={{ marginRight: '8px' }}></i>
+              {translate(`Order Completed! Redirecting to home page in ${redirectCountdown}s...`, `ஆர்டர் முடிந்தது! ${redirectCountdown} விநாடிகளில் முகப்புப் பக்கத்திற்குத் திரும்புகிறது...`)}
             </p>
 
             <div className="os-actions" style={{ maxWidth: '400px', margin: '0 auto' }}>
