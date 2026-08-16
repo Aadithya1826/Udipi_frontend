@@ -10,7 +10,6 @@ import { derivePageContext, getInitialGreetingForPage } from '../utils/voiceAgen
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const agentwaiterLogoImg = `${API_BASE}/static/assets/images/agentwaiter_logo.png`;
-const waiterImg = `${API_BASE}/static/assets/images/waiter.png`;
 
 const SILENCE_TIMEOUT = 1200; // Configurable silence threshold (1.2s)
 const RMS_THRESHOLD = 2.0;    // Configurable voice detection threshold
@@ -696,8 +695,8 @@ const AIAssistantOverlay = () => {
           onClick={toggleSidebar}
           title="Talk to Voice Agent"
         >
-          <div className="ai-trigger-avatar-wrap">
-            <img src={agentwaiterLogoImg} alt="Agent" style={{ pointerEvents: 'none', userSelect: 'none' }} />
+          <div className="ai-trigger-avatar-wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', borderRadius: '50%', width: '100%', height: '100%', overflow: 'hidden' }}>
+            <img src={agentwaiterLogoImg} alt="Agent Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           </div>
           <div className="ai-trigger-text-wrap">
             <span className="ai-trigger-title">Talk to Your Agent</span>
@@ -727,7 +726,9 @@ const AIAssistantOverlay = () => {
                 <div className="ai-waveform-bg">
                   {Array.from({ length: 15 }).map((_, i) => <div key={i} className="ai-wave-line" />)}
                 </div>
-                <img src={waiterImg} alt="Waiter" className="ai-mascot-namaste-original" />
+                <div style={{ width: '80px', height: '80px', borderRadius: '50%', overflow: 'hidden', zIndex: 2, boxShadow: '0 4px 15px rgba(0,0,0,0.3)', border: '2px solid rgba(255,255,255,0.9)', background: '#fff' }}>
+                  <img src={agentwaiterLogoImg} alt="Agent Waiter Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
               </div>
             )}
           </div>
@@ -764,7 +765,7 @@ const AIAssistantOverlay = () => {
                     }}>
                       {msg.role === 'user'
                         ? <i className="fa-solid fa-user-check" style={{ color: 'white', fontSize: '14px' }} />
-                        : <img src={waiterImg} alt="Agent" style={{ width: '80%', height: '80%', objectFit: 'contain' }} />
+                        : <img src={agentwaiterLogoImg} alt="Agent" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       }
                     </div>
                     <div className="ai-msg-bubble" style={{
@@ -786,7 +787,7 @@ const AIAssistantOverlay = () => {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   boxShadow: '0 4px 10px rgba(0,0,0,0.1)', overflow: 'hidden',
                 }}>
-                  <img src={waiterImg} alt="Agent" style={{ width: '80%', height: '80%', objectFit: 'contain' }} />
+                  <img src={agentwaiterLogoImg} alt="Agent" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <TypingDots />
               </div>
