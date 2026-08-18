@@ -331,7 +331,7 @@ export default function DineIn() {
           ...uniqueCategories.map(c => ({
             id: String(c.id),
             name: c.name,
-            image: c.image_url ? (c.image_url.startsWith('http') ? c.image_url : `http://dev-api.dataudipi.com${c.image_url}`) : null,
+            image: c.image_url ? (c.image_url.startsWith('http') ? c.image_url : `${API_BASE}${c.image_url}`) : null,
             region: isNorthIndian(c.name) ? 'north' : 'south'
           }))
         ];
@@ -359,7 +359,7 @@ export default function DineIn() {
             name: item.name,
             tamilName: item.name, // Fallback to english if tamil not available
             price: Number(item.price),
-            image: item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `http://dev-api.dataudipi.com${item.image_url}`) : null,
+            image: item.image_url ? (item.image_url.startsWith('http') ? item.image_url : `${API_BASE}${item.image_url}`) : null,
             description: item.description,
             tamilDesc: item.description,
             available: item.is_available,
