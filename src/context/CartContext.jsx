@@ -6,8 +6,6 @@ const CartContext = createContext();
 export const CartProvider = ({ children }) => {
   const location = useLocation();
   const isTakeaway = location.pathname.includes('takeaway') || location.pathname.includes('take-away');
-  const cartKey = isTakeaway ? 'takeaway' : 'dinein';
-
   const [tableNumber, setTableNumber] = useState(() => {
     let tableParam = new URLSearchParams(window.location.search).get('table');
     if (!tableParam && window.location.hash.includes('?')) {
@@ -22,6 +20,9 @@ export const CartProvider = ({ children }) => {
     const saved = localStorage.getItem('active_table_number') || '06';
     return saved.replace(/\D/g, '');
   });
+
+  const dineinKey = `dinein_${tableNumber}`;
+  const cartKey = isTakeaway ? 'takeaway' : dineinKey;
 
   useEffect(() => {
     let tableParam = new URLSearchParams(location.search).get('table');
@@ -38,12 +39,12 @@ export const CartProvider = ({ children }) => {
 
   const [carts, setCarts] = useState(() => {
     localStorage.removeItem('udipi_carts_v2');
-    const saved = sessionStorage.getItem('udipi_carts_session_v1');
-    return saved ? JSON.parse(saved) : { dinein: [], takeaway: [] };
+    const saved = sessionStorage.getItem('udipi_carts_session_v2');
+    return saved ? JSON.parse(saved) : { takeaway: [] };
   });
 
   useEffect(() => {
-    sessionStorage.setItem('udipi_carts_session_v1', JSON.stringify(carts));
+    sessionStorage.setItem('udipi_carts_session_v2', JSON.stringify(carts));
   }, [carts]);
 
   const cart = carts[cartKey] || [];
@@ -70,24 +71,18 @@ export const CartProvider = ({ children }) => {
     };
 
     setCarts((prev) => {
-      const isOnHome = location.pathname === '/' || location.pathname === '';
-      if (isOnHome || (!prev.dinein?.length && !prev.takeaway?.length)) {
-        return {
-          dinein: updateHelper(prev.dinein || []),
-          takeaway: updateHelper(prev.takeaway || [])
-        };
-      }
       const currentCart = prev[cartKey] || [];
       const updatedCart = updateHelper(currentCart);
-      const otherKey = cartKey === 'dinein' ? 'takeaway' : 'dinein';
+      const otherKey = isTakeaway ? dineinKey : 'takeaway';
       const otherCart = (!prev[otherKey] || prev[otherKey].length === 0) ? updatedCart : prev[otherKey];
       return { ...prev, [cartKey]: updatedCart, [otherKey]: otherCart };
     });
   };
 
   const syncCartToOtherMode = (targetMode) => {
-    const targetKey = String(targetMode).toLowerCase().includes('takeaway') || String(targetMode).toLowerCase().includes('take-away') ? 'takeaway' : 'dinein';
-    const sourceKey = targetKey === 'takeaway' ? 'dinein' : 'takeaway';
+    const isTargetTakeaway = String(targetMode).toLowerCase().includes('takeaway') || String(targetMode).toLowerCase().includes('take-away');
+    const targetKey = isTargetTakeaway ? 'takeaway' : dineinKey;
+    const sourceKey = isTargetTakeaway ? dineinKey : 'takeaway';
     setCarts(prev => {
       const sourceCart = prev[sourceKey] || [];
       const currentTarget = prev[targetKey] || [];
@@ -104,7 +99,7 @@ export const CartProvider = ({ children }) => {
       const updater = (list) => (list || [])
         .map((c) => (c.id === id ? { ...c, quantity: Math.max(0, (Number(c.quantity) || 0) + d) } : c))
         .filter((c) => c.quantity > 0);
-      return { dinein: updater(prev.dinein), takeaway: updater(prev.takeaway) };
+      return { ...prev, [dineinKey]: updater(prev[dineinKey]), takeaway: updater(prev.takeaway) };
     });
   };
 
@@ -116,26 +111,28 @@ export const CartProvider = ({ children }) => {
         if (q === 0) return (list || []).filter((c) => c.id !== id);
         return (list || []).map((c) => (c.id === id ? { ...c, quantity: q } : c));
       };
-      return { dinein: updater(prev.dinein), takeaway: updater(prev.takeaway) };
+      return { ...prev, [dineinKey]: updater(prev[dineinKey]), takeaway: updater(prev.takeaway) };
     });
   };
 
   const removeCartItem = (id) => {
     setCarts((prev) => ({
-      dinein: (prev.dinein || []).filter((c) => c.id !== id),
+      ...prev,
+      [dineinKey]: (prev[dineinKey] || []).filter((c) => c.id !== id),
       takeaway: (prev.takeaway || []).filter((c) => c.id !== id)
     }));
   };
 
   const updateNote = (id, note) => {
     setCarts((prev) => ({
-      dinein: (prev.dinein || []).map((c) => (c.id === id ? { ...c, note } : c)),
+      ...prev,
+      [dineinKey]: (prev[dineinKey] || []).map((c) => (c.id === id ? { ...c, note } : c)),
       takeaway: (prev.takeaway || []).map((c) => (c.id === id ? { ...c, note } : c))
     }));
   };
 
   const clearCart = () => {
-    setCarts({ dinein: [], takeaway: [] });
+    setCarts(prev => ({ ...prev, [dineinKey]: [], takeaway: [] }));
   };
 
   const clearAllCarts = () => {

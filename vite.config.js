@@ -13,7 +13,12 @@ export default defineConfig({
         target: 'http://127.0.0.1:8001',
         changeOrigin: true
       },
-      '/static': {
+      '/static/images': {
+        target: 'https://dev-api.dataudipi.com',
+        changeOrigin: true,
+        secure: false
+      },
+      '/static/assets': {
         target: 'http://127.0.0.1:8001',
         changeOrigin: true
       },

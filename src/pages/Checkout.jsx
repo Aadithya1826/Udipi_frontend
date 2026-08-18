@@ -295,7 +295,7 @@ const Checkout = ({ isTakeaway }) => {
               </div>
 
               <div className="form-group">
-                <label>Table No*</label>
+                <label>{isTakeaway ? 'Order Type*' : 'Table No*'}</label>
                 <input
                   type="text"
                   value={isTakeaway ? 'TakeAway' : (tableNumber || '6')}
@@ -358,7 +358,7 @@ const Checkout = ({ isTakeaway }) => {
           <div className="di-cart-header">
             <div className="di-cart-header-left">
               <span className="di-cart-title">Cart</span>
-              <span className="di-cart-table-pill">Table No : {isTakeaway ? 'TakeAway' : tableNumber} <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
+              <span className="di-cart-table-pill">{isTakeaway ? 'Order Type : TakeAway' : `Table No : ${tableNumber}`} <i className="fa-solid fa-chevron-down" style={{ fontSize: '0.6rem' }} /></span>
             </div>
             <button className="di-cart-close" onClick={() => setIsCartOpen(false)}>
               <i className="fa-solid fa-xmark"></i>
