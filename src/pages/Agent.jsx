@@ -140,6 +140,16 @@ function Agent() {
     }
   };
 
+  useEffect(() => {
+    if (recognition && !isListening) {
+      try {
+        recognition.start();
+      } catch (err) {
+        console.warn('Auto-start mic failed:', err);
+      }
+    }
+  }, []);
+
   const speakText = (text) => {
     if (isMutedRef.current || !window.speechSynthesis) return;
 

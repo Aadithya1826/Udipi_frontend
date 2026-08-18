@@ -11,7 +11,7 @@ import { derivePageContext, getInitialGreetingForPage } from '../utils/voiceAgen
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const agentwaiterLogoImg = `${API_BASE}/static/assets/images/agentwaiter_logo.png`;
 
-const SILENCE_TIMEOUT = 1200; // Configurable silence threshold (1.2s)
+const SILENCE_TIMEOUT = 1200; // Configurable silence threshold (reduced to 1.2s for faster response)
 const RMS_THRESHOLD = 2.0;    // Configurable voice detection threshold
 
 // ── Wave animation helper ─────────────────────────────────────────────────────
@@ -507,11 +507,9 @@ const AIAssistantOverlay = () => {
         document.dispatchEvent(new CustomEvent('select-payment', { detail: { method } }));
         setTimeout(() => {
           document.dispatchEvent(new CustomEvent('confirm-place-order', { detail: { method } }));
-          if (method === 'Cash') {
-            const confirmBtn = document.getElementById('payment-confirm-btn');
-            if (confirmBtn) {
-              confirmBtn.click();
-            }
+          const confirmBtn = document.getElementById('payment-confirm-btn');
+          if (confirmBtn) {
+            confirmBtn.click();
           }
         }, 300);
         break;
@@ -679,17 +677,25 @@ const AIAssistantOverlay = () => {
   };
 
   const toggleSidebar = () => {
-    setIsOpen(o => !o);
-    if (isOpen) stopListening();
+    if (isOpen) {
+      setIsOpen(false);
+      stopListening();
+    } else {
+      setIsOpen(true);
+      if (isVoiceMode) {
+        setMicState('LISTENING');
+        setTimeout(() => startListening(), 100);
+      }
+    }
   };
 
   // ── Don't render on the voice-agent page ──────────────────────────────────
-  if (location.pathname === '/voice-agent') return null;
+  if (location.pathname === '/agent') return null;
 
   return (
     <>
       {/* Floating trigger button */}
-      {!isOpen && !location.pathname.includes('order-success') && (
+      {!isOpen && (
         <div
           className={`ai-trigger-btn ${(micState === 'LISTENING' || micState === 'RECORDING') ? 'is-listening' : ''}`}
           onClick={toggleSidebar}

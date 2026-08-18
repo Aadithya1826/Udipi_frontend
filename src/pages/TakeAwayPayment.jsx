@@ -121,16 +121,19 @@ const TakeAwayPayment = () => {
         sessionStorage.setItem('chatbot_flow_stage', 'payment_done');
         localStorage.setItem('active_order_id', generatedOrderId);
         localStorage.setItem('active_order_type', 'takeaway');
+        setFlowStage('ORDER_TRACKING');
         navigate('/takeaway-order-success', {
           state: {
             orderId: generatedOrderId,
             cartData: cart,
-            subtotal, gst, total, formData, paymentMethod: 'Cash'
+            subtotal, gst, total, formData, paymentMethod: 'Cash',
+            autoTrack: true
           }
         });
       } catch (err) {
         console.error('Order placement error:', err);
         sessionStorage.setItem('chatbot_flow_stage', 'payment_done');
+        isSubmittingRef.current = false;
         navigate('/takeaway-order-success', {
           state: {
             orderId: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -171,6 +174,10 @@ const TakeAwayPayment = () => {
       const generatedOrderId = orderResult.orderId || (dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`);
 
       const res = await new Promise((resolve) => {
+        if (window.Razorpay) {
+          resolve(true);
+          return;
+        }
         const script = document.createElement('script');
         script.src = 'https://checkout.razorpay.com/v1/checkout.js';
         script.onload = () => resolve(true);
@@ -211,6 +218,7 @@ const TakeAwayPayment = () => {
 
       if (!razorpayKeyId || !rzpOrder.success) {
         console.warn('Razorpay configuration or order creation failed. Redirecting to payment failed page.');
+        isSubmittingRef.current = false;
         navigate('/payment-failed', { state: { total, isTakeAway: true, formData, cart } });
         return;
       }
@@ -227,12 +235,14 @@ const TakeAwayPayment = () => {
           sessionStorage.setItem('chatbot_flow_stage', 'payment_done');
           localStorage.setItem('active_order_id', generatedOrderId);
           localStorage.setItem('active_order_type', 'takeaway');
+          setFlowStage('ORDER_TRACKING');
           // On successful payment
           navigate('/takeaway-order-success', {
             state: {
               orderId: generatedOrderId,
               cartData: cart,
-              subtotal, gst, total, formData, paymentMethod: 'Razorpay'
+              subtotal, gst, total, formData, paymentMethod: 'Razorpay',
+              autoTrack: true
             }
           });
         },
@@ -247,12 +257,15 @@ const TakeAwayPayment = () => {
       const rzp = new window.Razorpay(options);
       rzp.on('payment.failed', function (response) {
         console.error('Payment failed:', response.error);
+        isSubmittingRef.current = false;
         navigate('/payment-failed', { state: { total, isTakeAway: true, formData, cart } });
       });
       rzp.open();
+      isSubmittingRef.current = false;
 
     } catch (err) {
       console.error('Payment error:', err);
+      isSubmittingRef.current = false;
       navigate('/payment-failed', { state: { total, isTakeAway: true, formData, cart } });
     }
   };

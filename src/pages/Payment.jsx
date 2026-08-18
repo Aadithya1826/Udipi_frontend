@@ -122,16 +122,19 @@ const Payment = () => {
         localStorage.setItem('active_order_id', generatedOrderId);
         localStorage.setItem('active_order_type', 'dine-in');
         localStorage.setItem('active_table_number', tableNumber || '06');
+        setFlowStage('ORDER_TRACKING');
         navigate('/order-success', {
           state: {
             orderId: generatedOrderId,
             cartData: cart,
-            subtotal, gst, total, formData, paymentMethod: 'Cash'
+            subtotal, gst, total, formData, paymentMethod: 'Cash',
+            autoTrack: true
           }
         });
       } catch (err) {
         console.error('Order placement error:', err);
         sessionStorage.setItem('chatbot_flow_stage', 'payment_done');
+        isSubmittingRef.current = false;
         navigate('/order-success', {
           state: {
             orderId: `ORD-${Math.floor(100000 + Math.random() * 900000)}`,
@@ -172,6 +175,10 @@ const Payment = () => {
       const generatedOrderId = orderResult.orderId || (dbId ? `ORD-${String(dbId).padStart(6, '0')}` : `ORD-${Math.floor(100000 + Math.random() * 900000)}`);
 
       const res = await new Promise((resolve) => {
+        if (window.Razorpay) {
+          resolve(true);
+          return;
+        }
         const script = document.createElement('script');
         script.src = 'https://checkout.razorpay.com/v1/checkout.js';
         script.onload = () => resolve(true);
@@ -212,6 +219,7 @@ const Payment = () => {
 
       if (!razorpayKeyId || !rzpOrder.success) {
         console.warn('Razorpay configuration or order creation failed. Redirecting to payment failed page.');
+        isSubmittingRef.current = false;
         navigate('/payment-failed', { state: { total, isTakeAway: false, formData, cart } });
         return;
       }
@@ -229,12 +237,14 @@ const Payment = () => {
           localStorage.setItem('active_order_id', generatedOrderId);
           localStorage.setItem('active_order_type', 'dine-in');
           localStorage.setItem('active_table_number', tableNumber || '06');
+          setFlowStage('ORDER_TRACKING');
           // On successful payment
           navigate('/order-success', {
             state: {
               orderId: generatedOrderId,
               cartData: cart,
-              subtotal, gst, total, formData, paymentMethod: 'Razorpay'
+              subtotal, gst, total, formData, paymentMethod: 'Razorpay',
+              autoTrack: true
             }
           });
         },
@@ -249,12 +259,15 @@ const Payment = () => {
       const rzp = new window.Razorpay(options);
       rzp.on('payment.failed', function (response) {
         console.error('Payment failed:', response.error);
+        isSubmittingRef.current = false;
         navigate('/payment-failed', { state: { total, isTakeAway: false, formData, cart } });
       });
       rzp.open();
+      isSubmittingRef.current = false;
 
     } catch (err) {
       console.error('Payment error:', err);
+      isSubmittingRef.current = false;
       navigate('/payment-failed', { state: { total, isTakeAway: false, formData, cart } });
     }
   };

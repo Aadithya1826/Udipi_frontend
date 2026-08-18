@@ -209,6 +209,7 @@ export default function TakeAway() {
           if (!name) return '';
           let clean = name.trim();
           clean = clean.replace(/\s*\(.*?\)\s*/g, ' ').trim();
+          clean = clean.replace(/varities/ig, 'Varieties');
           return clean;
         };
 
@@ -310,7 +311,7 @@ export default function TakeAway() {
     setShowAllItems(false)
   }, [activeCategory])
 
-  const baseItems = menuItems[activeCategory] ?? menuItems.all
+  const baseItems = activeCategory === 'all' ? menuItems.all : (menuItems[activeCategory] || []);
 
   // Apply search, filters and sorting
   let processedItems = [...baseItems]

@@ -74,10 +74,10 @@ export function extractName(rawInput) {
     }
   }
 
-  // Take only the first "word cluster" before commas, conjunctions, order phrases
+  // Take only the first "word cluster" before conjunctions or order phrases
   text = text
-    .split(/[,.\n]/)[0]
-    .split(/\s+(?:and|my|i want|i need|give|please|with)\b/i)[0]
+    .split(/[.\n]/)[0]
+    .split(/\s+(?:my|i want|i need|give|please|with)\b/i)[0]
     .trim();
 
   // Remove trailing punctuation
@@ -132,12 +132,16 @@ export function getInitialGreetingForPage(pageCtx, agentState) {
 // ── Flow stage for a given page ───────────────────────────────────────────
 export function getFlowStageForPage(pageCtx, currentStage) {
   const { page } = pageCtx;
-  // Never override terminal stages
-  if (['ORDER_PLACED', 'LIVE_ORDER', 'ORDER_SERVED', 'FEEDBACK', 'COMPLETED', 'PAYMENT_PROCESSING'].includes(currentStage)) {
+  
+  if (page === 'DINE_IN' || page === 'TAKEAWAY') return 'ORDER_BUILDING';
+  if (page === 'CHECKOUT') return 'CHECKOUT_REVIEW';
+  if (page === 'PAYMENT') return currentStage === 'PAYMENT_PROCESSING' ? currentStage : 'PAYMENT_SELECT';
+  if (page === 'ORDER_SUCCESS') return currentStage === 'ORDER_TRACKING' ? currentStage : 'ORDER_PLACED';
+
+  // Never override terminal stages if on generic pages
+  if (['ORDER_PLACED', 'LIVE_ORDER', 'ORDER_SERVED', 'FEEDBACK', 'COMPLETED'].includes(currentStage)) {
     return currentStage;
   }
-  if (page === 'DINE_IN' || page === 'TAKEAWAY') return 'ORDER_BUILDING';
-  if (['PAYMENT', 'CHECKOUT', 'ORDER_SUCCESS', 'INVOICE'].includes(page)) return currentStage || 'CHECKOUT';
   return currentStage || 'GREETING';
 }
 
