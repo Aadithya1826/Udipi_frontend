@@ -10,24 +10,24 @@ export default defineConfig({
     allowedHosts: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8001',
+        target: 'http://dev-api.dataudipi.com',
         changeOrigin: true
       },
       '/static/images': {
-        target: 'https://dev-api.dataudipi.com',
+        target: 'http://dev-api.dataudipi.com',
         changeOrigin: true,
         secure: false
       },
       '/static/assets': {
-        target: 'http://127.0.0.1:8001',
+        target: 'http://dev-api.dataudipi.com',
         changeOrigin: true
       },
       '/docs': {
-        target: 'http://127.0.0.1:8001',
+        target: 'http://dev-api.dataudipi.com',
         changeOrigin: true
       },
       '/openapi.json': {
-        target: 'http://127.0.0.1:8001',
+        target: 'http://dev-api.dataudipi.com',
         changeOrigin: true
       }
     }
