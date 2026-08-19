@@ -7,9 +7,9 @@ import Header from '../components/Header'
 import Footer from '../components/Footer'
 import { Html5Qrcode } from 'html5-qrcode'
 import '../styles/home.css'
-const dataudipiTitleImg = `${import.meta.env.VITE_API_URL}/static/assets/images/Dataudupi-Title.png`;
-const dineinLogoImg = `${import.meta.env.VITE_API_URL}/static/assets/images/dinein-logo.png`;
-const takeawayLogoImg = `${import.meta.env.VITE_API_URL}/static/assets/images/takeaway-logo.png`;
+const dataudipiTitleImg = `/assets/images/Dataudupi-Title.png`;
+const dineinLogoImg = `/assets/images/dinein-logo.png`;
+const takeawayLogoImg = `/assets/images/takeaway-logo.png`;
 
 function Home() {
   const navigate = useNavigate()

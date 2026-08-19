@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
 import '../styles/components.css'
-const dataudipiTitleImg = `${import.meta.env.VITE_API_URL}/static/assets/images/Dataudupi-Title.png`;
-const udupiBannerImg = `${import.meta.env.VITE_API_URL}/static/assets/images/udupi-banner.png`;
+const dataudipiTitleImg = `/assets/images/Dataudupi-Title.png`;
+const udupiBannerImg = `/assets/images/udupi-banner.png`;
 
 function Header({ tableNumber = '06', showFullHeader = false, useTitleImage = false, showDateTime = true, hideTableIndicator = false, onTableClick, showBranchSelector = false, children }) {
   const navigate = useNavigate()

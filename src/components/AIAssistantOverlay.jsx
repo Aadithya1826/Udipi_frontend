@@ -9,7 +9,7 @@ import { sendToCustomerMCP } from '../services/mcpCustomerService';
 import { derivePageContext, getInitialGreetingForPage } from '../utils/voiceAgentUtils';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
-const agentwaiterLogoImg = `${API_BASE}/static/assets/images/agentwaiter_logo.png`;
+const agentwaiterLogoImg = `/assets/images/agentwaiter_logo.png`;
 
 const SILENCE_TIMEOUT = 3000; // Configurable silence threshold (increased to 3.0s to allow users to speak long sentences without being cut off)
 const RMS_THRESHOLD = 2.0;    // Configurable voice detection threshold

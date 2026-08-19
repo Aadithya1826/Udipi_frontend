@@ -6,7 +6,7 @@ import Header from '../components/Header'
 import { fetchCategories, fetchItems, formatMenuData, placeOrder } from '../services/menuService'
 import { sendToCustomerMCP } from '../services/mcpCustomerService'
 import '../styles/pages.css'
-const agentwaiterLogoImg = `${import.meta.env.VITE_API_URL}/static/assets/images/agentwaiter_logo.png`;
+const agentwaiterLogoImg = `/assets/images/agentwaiter_logo.png`;
 
 function Agent() {
   const navigate = useNavigate()
