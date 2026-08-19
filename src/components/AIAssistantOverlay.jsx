@@ -11,7 +11,7 @@ import { derivePageContext, getInitialGreetingForPage } from '../utils/voiceAgen
 const API_BASE = import.meta.env.VITE_API_URL || '';
 const agentwaiterLogoImg = `${API_BASE}/static/assets/images/agentwaiter_logo.png`;
 
-const SILENCE_TIMEOUT = 1200; // Configurable silence threshold (reduced to 1.2s for faster response)
+const SILENCE_TIMEOUT = 3000; // Configurable silence threshold (increased to 3.0s to allow users to speak long sentences without being cut off)
 const RMS_THRESHOLD = 2.0;    // Configurable voice detection threshold
 
 // ── Wave animation helper ─────────────────────────────────────────────────────
@@ -481,7 +481,22 @@ const AIAssistantOverlay = () => {
       }
 
       case 'view_cart': {
-        if (setIsCartOpen) setIsCartOpen(true);
+        const route = agentState.orderType === 'takeaway' ? '/take-away' : '/dine-in';
+        if (window.location.pathname !== route && window.location.pathname !== '/') {
+          navigate(route);
+          setTimeout(() => {
+            if (setIsCartOpen) setIsCartOpen(true);
+          }, 100);
+        } else {
+          if (window.location.pathname === '/' && route) {
+             navigate(route);
+             setTimeout(() => {
+               if (setIsCartOpen) setIsCartOpen(true);
+             }, 100);
+          } else {
+             if (setIsCartOpen) setIsCartOpen(true);
+          }
+        }
         break;
       }
 
