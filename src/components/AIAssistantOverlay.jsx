@@ -1,18 +1,16 @@
 // AIAssistantOverlay — Voice Agent primary ordering journey controller
-// No DB access — all actions via ui_actions[] dispatched to frontend state
+// Voice transport: Vapi (@vapi-ai/web)
+// All business logic remains in existing stores/contexts — no backend changes.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useVoiceAgent } from '../context/VoiceAgentContext';
 import { useCart } from '../context/CartContext';
 import './AIAssistantOverlay.css';
-import { sendToCustomerMCP } from '../services/mcpCustomerService';
-import { derivePageContext, getInitialGreetingForPage } from '../utils/voiceAgentUtils';
+import { useVapiAssistant, CALL_STATUS } from '../hooks/useVapiAssistant';
+import { derivePageContext } from '../utils/voiceAgentUtils';
+import { isVapiConfigured, getVapiConfigError, muteVapiCall, sendVapiMessage } from '../services/vapiService';
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
 const agentwaiterLogoImg = `/assets/images/agentwaiter_logo.png`;
-
-const SILENCE_TIMEOUT = 3000; // Configurable silence threshold (increased to 3.0s to allow users to speak long sentences without being cut off)
-const RMS_THRESHOLD = 2.0;    // Configurable voice detection threshold
 
 // ── Wave animation helper ─────────────────────────────────────────────────────
 const WaveSymbol = ({ active }) => (
@@ -48,31 +46,27 @@ const isInternalMessage = (content) => {
     lower.includes('[debug') ||
     lower.includes('[mcp') ||
     lower.includes('[internal') ||
-    lower.includes('system note')
+    lower.includes('system note') ||
+    lower.includes('[context update]')
   );
 };
 
+// ── Derive micState from Vapi call status ─────────────────────────────────────
+function deriveMicState(callStatus, isSpeaking, isListening) {
+  if (callStatus === CALL_STATUS.CONNECTING) return 'PROCESSING';
+  if (callStatus === CALL_STATUS.ENDING)     return 'PROCESSING';
+  if (isSpeaking)                            return 'SPEAKING';
+  if (isListening && callStatus === CALL_STATUS.ACTIVE) return 'LISTENING';
+  return 'IDLE';
+}
+
 const AIAssistantOverlay = () => {
+  // Text input mode (voice is Vapi; typing is still available as fallback)
   const [isVoiceMode, setIsVoiceMode] = useState(true);
-  const [micState, setMicState]       = useState('IDLE'); // 'LISTENING' | 'RECORDING' | 'PROCESSING' | 'SPEAKING' | 'IDLE'
   const [inputText, setInputText]     = useState('');
-  const [isLoading, setIsLoading]     = useState(false);
-  const [isMuted, setIsMuted]         = useState(false);
-  const [isSpeaking, setIsSpeaking]   = useState(false);
-  const isSpeakingRef                 = useRef(false);
-  const isVoiceModeRef                = useRef(true);
 
-  // Keep refs in sync
-  useEffect(() => {
-    isSpeakingRef.current = isSpeaking;
-  }, [isSpeaking]);
-
-  useEffect(() => {
-    isVoiceModeRef.current = isVoiceMode;
-  }, [isVoiceMode]);
-
-  const location    = useLocation();
-  const navigate    = useNavigate();
+  const location  = useLocation();
+  const navigate  = useNavigate();
 
   const {
     agentState,
@@ -98,7 +92,6 @@ const AIAssistantOverlay = () => {
     cart,
     addToCart,
     removeCartItem,
-    clearCart,
     isCartOpen,
     setIsCartOpen,
     setTableNumber: setCartTableNumber,
@@ -106,21 +99,29 @@ const AIAssistantOverlay = () => {
     totalAmount,
     setActiveCategory,
     updateItemQuantity,
-    updateNote,
   } = useCart();
 
-  const sidebarRef             = useRef(null);
-  const messagesEndRef          = useRef(null);
-  const currentAudioRef         = useRef(null);
-  const recognitionRef          = useRef(null);
-  const transcriptRef           = useRef('');
-  const silenceTimerRef         = useRef(null);
-  const processInputRef         = useRef(null);
-  const isProcessingVoiceRef    = useRef(false);
-  const hasSpeechStartedRef     = useRef(false);
-  const shouldSubmitRef         = useRef(false);
-  const requestCounterRef       = useRef(0);
-  const checkoutTimerRef        = useRef(null);
+  // ── Vapi hook ─────────────────────────────────────────────────────────────
+  const {
+    callStatus,
+    isConnected,
+    isConnecting,
+    isSpeaking,
+    isListening,
+    transcript,
+    error: vapiError,
+    startAssistant,
+    stopAssistant,
+    toggleAssistant,
+    isConfigured,
+  } = useVapiAssistant();
+
+  // ── Derived mic state for UI (identical to old states) ───────────────────
+  const micState = deriveMicState(callStatus, isSpeaking, isListening);
+
+  const sidebarRef     = useRef(null);
+  const messagesEndRef = useRef(null);
+  const checkoutTimerRef = useRef(null);
 
   // ── Synchronize route with context state ──────────────────────────────────
   useEffect(() => {
@@ -134,578 +135,126 @@ const AIAssistantOverlay = () => {
     }
   }, [isCartOpen]);
 
-  // ── Auto-open and greet ────────────────────────────────────────────────────
+  // ── Auto-open and greet (first visit) ────────────────────────────────────
+  // With Vapi, the greeting is handled by the Vapi assistant itself when the
+  // call starts. We just open the overlay and start the call.
   useEffect(() => {
     const isSuccessPage = location.pathname.includes('order-success');
     if (!agentState.isGreeted && !isSuccessPage) {
       setIsGreeted(true);
       setIsOpen(true);
       setIsVoiceMode(true);
-      const pageCtx = derivePageContext(location.pathname);
-      const initialGreeting = getInitialGreetingForPage(pageCtx, agentState) ||
-        '[SYSTEM: Start the ordering journey. Greet the customer warmly, welcome them to Data Udipi, and ask for their name. flow_stage=GREETING]';
+      // Small delay so the UI renders before call starts
       const t = setTimeout(() => {
-        processInput(initialGreeting);
-      }, 600);
+        if (isConfigured) {
+          startAssistant();
+        }
+      }, 800);
       return () => clearTimeout(t);
     }
-  }, [agentState.isGreeted, location.pathname, setIsGreeted, agentState]);
+  }, [agentState.isGreeted, location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-scroll messages ──────────────────────────────────────────────────
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  }, [messages, micState]);
 
-  // ── Listen for order status updates (from VoiceAgentContext polling) ───────
+  // ── Sync Vapi transcript into VoiceAgentContext messages ─────────────────
+  // (The hook already calls setMessages; this keeps the display up to date.)
+  // No extra work needed here — transcript is managed in the hook.
+
+  // ── Listen for order status updates ──────────────────────────────────────
   useEffect(() => {
     const handleStatusUpdate = (e) => {
       const status = e.detail?.status;
       if (status) {
         setOrderStatus(status);
-        const statusMsgs = {
-          PENDING:   '[SYSTEM: Order status is now RECEIVED. Inform the customer warmly that their order has been received and confirmed.]',
-          CONFIRMED: '[SYSTEM: Order status is now RECEIVED. Inform the customer warmly that their order has been received and confirmed.]',
-          PREPARING: '[SYSTEM: Order status is now PREPARING. Inform the customer warmly that their food is being prepared.]',
-          READY:     '[SYSTEM: Order status is now READY. Tell the customer their order is ready and will be served soon.]',
-          SERVED:    '[SYSTEM: Order status is now SERVED. Congratulate the customer and wish them a great meal.]',
-          COMPLETED: '[SYSTEM: Order status is now COMPLETED. Congratulate the customer and wish them a great meal.]',
-        };
-        if (statusMsgs[status]) {
-          setIsOpen(true);
-          setTimeout(() => {
-            if (processInputRef.current) processInputRef.current(statusMsgs[status]);
-          }, 300);
-        }
+        // Open the overlay to surface the update
+        setIsOpen(true);
       }
     };
     document.addEventListener('order-status-update', handleStatusUpdate);
     return () => document.removeEventListener('order-status-update', handleStatusUpdate);
-  }, []);
-
-
+  }, [setOrderStatus, setIsOpen]);
 
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (checkoutTimerRef.current) clearTimeout(checkoutTimerRef.current);
-      if (recognitionRef.current) {
-        try { recognitionRef.current.abort(); } catch {}
-      }
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     };
   }, []);
 
-  // ── Audio playback ────────────────────────────────────────────────────────
-  const stopAudioPlayback = useCallback(() => {
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      currentAudioRef.current.currentTime = 0;
-      currentAudioRef.current = null;
-    }
-    window.speechSynthesis?.cancel();
-    setIsSpeaking(false);
-    isSpeakingRef.current = false;
-    setMicState('IDLE');
-  }, []);
-
-  const speakFallback = useCallback((text, onEnd) => {
-    if (!text || isMuted) { onEnd?.(); return; }
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    const voices = window.speechSynthesis.getVoices();
-    const lang = agentState.detectedLanguage;
-    const langMap = {
-      tamil: 'ta', malayalam: 'ml', kannada: 'kn', telugu: 'te',
-      hindi: 'hi', urdu: 'ur', bengali: 'bn', gujarati: 'gu',
-      punjabi: 'pa', english: 'en',
-    };
-    const bcp = langMap[lang] || 'en';
-    const voice = voices.find(v => v.lang.startsWith(bcp)) ||
-                  voices.find(v => v.lang.startsWith('en'));
-    if (voice) utter.voice = voice;
-    utter.lang = `${bcp}-IN`;
-    utter.onend = () => { setIsSpeaking(false); isSpeakingRef.current = false; setMicState('IDLE'); onEnd?.(); };
-    utter.onerror = () => { setIsSpeaking(false); isSpeakingRef.current = false; setMicState('IDLE'); onEnd?.(); };
-    setIsSpeaking(true);
-    isSpeakingRef.current = true;
-    setMicState('SPEAKING');
-    window.speechSynthesis.speak(utter);
-  }, [isMuted, agentState.detectedLanguage]);
-
-  // ── Microphone recording cleanup & control ─────────────────────────────────
-  const cleanupMic = useCallback(() => {
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
-    }
-    if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
-    }
-  }, []);
-
-  const stopListening = useCallback(() => {
-    cleanupMic();
-    if (recognitionRef.current) {
-      try { recognitionRef.current.abort(); } catch {}
-      recognitionRef.current = null;
-    }
-    setMicState('IDLE');
-  }, [cleanupMic]);
-
-  // ── (Removed outside click interference so agent keeps listening) ──────────
-
-  const startListening = useCallback(() => {
-    if (isSpeakingRef.current || isProcessingVoiceRef.current) return;
-    stopAudioPlayback();
-    cleanupMic();
-    
-    shouldSubmitRef.current = false;
-    hasSpeechStartedRef.current = false;
-    transcriptRef.current = '';
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setMessages(prev => [...prev, { role: 'model', content: 'Speech recognition is not supported in this browser. Please type your message.' }]);
-      setIsVoiceMode(false);
-      isVoiceModeRef.current = false;
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      // Use Indian English by default for optimal recognition of local dishes (e.g. Idly, Dosa, Parcel)
-      recognition.lang = 'en-IN';
-      
-      recognition.onstart = () => {
-        setMicState('LISTENING');
-      };
-
-      recognition.onresult = (event) => {
-        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-
-        let combined = '';
-        for (let i = 0; i < event.results.length; ++i) {
-          combined += event.results[i][0].transcript;
-        }
-        
-        combined = combined.trim();
-        if (combined) {
-          if (!hasSpeechStartedRef.current) {
-            hasSpeechStartedRef.current = true;
-            setMicState('RECORDING');
-          }
-          transcriptRef.current = combined;
-          setInputText(combined);
-
-          silenceTimerRef.current = setTimeout(() => {
-            shouldSubmitRef.current = true;
-            recognition.stop();
-          }, SILENCE_TIMEOUT); // Use configured SILENCE_TIMEOUT for snappier responses
-        }
-      };
-
-      recognition.onend = () => {
-        if (shouldSubmitRef.current) {
-          isProcessingVoiceRef.current = true;
-          setMicState('PROCESSING');
-          let finalStr = transcriptRef.current.trim();
-          
-          // Normalize common Web Speech API misrecognitions for Indian terms
-          if (finalStr) {
-            finalStr = finalStr.replace(/\bitaly\b/gi, 'Idly');
-            finalStr = finalStr.replace(/\bpaise\b/gi, 'Parcel');
-            finalStr = finalStr.replace(/\bpart\b/gi, 'Parcel');
-            finalStr = finalStr.replace(/\bgobbled\b/gi, 'Gobi');
-          }
-
-          setInputText('');
-          transcriptRef.current = '';
-          
-          if (finalStr) {
-            if (processInputRef.current) processInputRef.current(finalStr, null);
-          } else {
-            isProcessingVoiceRef.current = false;
-            hasSpeechStartedRef.current = false;
-            shouldSubmitRef.current = false;
-            if (isVoiceModeRef.current && !isSpeakingRef.current) {
-              setMicState('LISTENING');
-              setTimeout(() => startListening(), 300);
-            }
-          }
-        } else {
-          // Browser stopped it naturally, or user clicked mic off. Restart if still in voice mode.
-          if (isVoiceModeRef.current && !isSpeakingRef.current && !isProcessingVoiceRef.current) {
-            setTimeout(() => startListening(), 300);
-          }
-        }
-      };
-
-      recognition.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
-        if (event.error === 'not-allowed') {
-          setMessages(prev => [...prev, { role: 'model', content: 'Microphone access denied. Please type your message.' }]);
-          setIsVoiceMode(false);
-          isVoiceModeRef.current = false;
-        }
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (err) {
-      console.error('Mic initialization error:', err);
-    }
-  }, [stopAudioPlayback, cleanupMic, agentState.detectedLanguage, setMessages, setIsVoiceMode]);
-
-  // ── Fetch fresh menu items for cart matching ──────────────────────────────
-  const fetchMenuItems = useCallback(async () => {
-    try {
-      const rid = localStorage.getItem('selected_restaurant_id') || '1';
-      const res = await fetch(`${API_BASE}/api/v1/public/menu/items?restaurant_id=${rid}`);
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
-    } catch { return []; }
-  }, []);
-
-  // ── Handle ui_actions from the AI (no DB access) ──────────────────────────
-  const handleUIAction = useCallback(async (action, menuItems) => {
-    const a = action.action?.toLowerCase();
-    if (!a) return;
-
-    switch (a) {
-      case 'set_customer': {
-        const name  = action.name  || action.customer_name  || null;
-        const phone = action.phone || action.customer_phone || null;
-        setCustomerInfo({ name, phone });
-        if (name) document.dispatchEvent(new CustomEvent('update-name',  { detail: { name } }));
-        if (phone) document.dispatchEvent(new CustomEvent('update-phone', { detail: { phone } }));
-        break;
-      }
-
-      case 'set_flow_stage': {
-        const stage = action.stage || action.flow_stage || '';
-        if (stage) setFlowStage(stage);
-        break;
-      }
-
-      case 'set_order_type': {
-        const type = (action.type || action.order_type || '').toLowerCase();
-        setOrderType(type);
-        break;
-      }
-
-      case 'set_region': {
-        const region = (action.region || '').toLowerCase();
-        if (region.includes('north')) {
-           document.dispatchEvent(new CustomEvent('change-region', { detail: { region: 'north' } }));
-        } else if (region.includes('south')) {
-           document.dispatchEvent(new CustomEvent('change-region', { detail: { region: 'south' } }));
-        } else {
-           document.dispatchEvent(new CustomEvent('change-region', { detail: { region: 'all' } }));
-        }
-        break;
-      }
-
-      case 'set_table_number': {
-        const num = String(action.table || action.table_number || '').replace(/\D/g,'') || action.table;
-        if (num) {
-          setTableNumber(num);
-          if (setCartTableNumber) setCartTableNumber(num);
-        }
-        break;
-      }
-
-      case 'navigate': {
-        const page = (action.page || '').toLowerCase();
-        if (page === 'dine-in' || page === 'dinein')           navigate('/dine-in');
-        else if (page === 'take-away' || page === 'takeaway')  navigate('/take-away');
-        else if (page === 'checkout' || page === 'cart')       navigate(agentState.orderType === 'takeaway' ? '/takeaway-checkout' : '/checkout');
-        else if (page === 'payment')                           navigate(agentState.orderType === 'takeaway' ? '/takeaway-payment' : '/payment');
-        else if (page === 'home')                              navigate('/');
-        else if (action.page) {
-          const categoryName = action.page.trim();
-          const lowerName = categoryName.toLowerCase();
-          const rid = localStorage.getItem('selected_restaurant_id') || '1';
-          fetch(`${API_BASE}/api/v1/public/menu/categories?restaurant_id=${rid}`)
-            .then(res => res.json())
-            .then(categories => {
-              const matched = categories.find(c => c.name?.toLowerCase().includes(lowerName))
-                            || categories.find(c => lowerName.includes(c.name?.toLowerCase()));
-              if (matched && setActiveCategory) {
-                const targetRoute = agentState.orderType === 'takeaway' ? '/take-away' : '/dine-in';
-                if (window.location.pathname !== targetRoute) {
-                  navigate(targetRoute);
-                }
-                setTimeout(() => {
-                  setActiveCategory(String(matched.id));
-                  document.dispatchEvent(new CustomEvent('change-category', { detail: { categoryId: String(matched.id) } }));
-                }, 100);
-              }
-            }).catch(err => console.warn('Failed to navigate category:', err));
-        }
-        break;
-      }
-
-      case 'add_to_cart': {
-        const itemName = action.item || '';
-        const qty = Number(action.quantity) || 1;
-        if (!itemName) break;
-        const items = menuItems || await fetchMenuItems();
-        const match = items.find(m => m.name?.toLowerCase() === itemName.toLowerCase())
-                   || items.find(m => m.name?.toLowerCase().includes(itemName.toLowerCase()));
-        if (match) {
-          let img = null;
-          if (match.image_url) {
-            img = match.image_url.startsWith('http') ? match.image_url : `${API_BASE}${match.image_url}`;
-          }
-          addToCart({ id: match.id, name: match.name, price: Number(match.price), image: img }, qty);
-          
-          if (setIsCartOpen) {
-            setIsOpen(false);
-            setIsCartOpen(true);
-            setTimeout(() => {
-              setIsCartOpen(false);
-              setIsOpen(true);
-            }, 3000);
-          }
-        }
-        break;
-      }
-
-      case 'remove_from_cart': {
-        const itemName = action.item || '';
-        const found = cart.find(c => c.name?.toLowerCase() === itemName.toLowerCase());
-        if (found) removeCartItem(found.id);
-        break;
-      }
-
-      case 'view_cart': {
-        const route = agentState.orderType === 'takeaway' ? '/take-away' : '/dine-in';
-        if (window.location.pathname !== route && window.location.pathname !== '/') {
-          navigate(route);
-          setTimeout(() => {
-            if (setIsCartOpen) setIsCartOpen(true);
-          }, 100);
-        } else {
-          if (window.location.pathname === '/' && route) {
-             navigate(route);
-             setTimeout(() => {
-               if (setIsCartOpen) setIsCartOpen(true);
-             }, 100);
-          } else {
-             if (setIsCartOpen) setIsCartOpen(true);
-          }
-        }
-        break;
-      }
-
-      case 'trigger_checkout': {
-        setFlowStage('CHECKOUT_REVIEW');
-        const route = agentState.orderType === 'takeaway' ? '/takeaway-checkout' : '/checkout';
-        navigate(route);
-        break;
-      }
-
-      case 'auto_navigate_to_payment': {
-        const delay = Number(action.delay_ms) || 2500;
-        setFlowStage('PAYMENT_SELECT');
-        checkoutTimerRef.current = setTimeout(() => {
-          const route = agentState.orderType === 'takeaway' ? '/takeaway-payment' : '/payment';
-          navigate(route);
-        }, delay);
-        break;
-      }
-
-      case 'payment_method': {
-        const method = (action.method || 'Cash').toLowerCase().includes('upi') ? 'UPI' : 'Cash';
-        document.dispatchEvent(new CustomEvent('select-payment', { detail: { method } }));
-        setTimeout(() => {
-          document.dispatchEvent(new CustomEvent('confirm-place-order', { detail: { method } }));
-          const confirmBtn = document.getElementById('payment-confirm-btn');
-          if (confirmBtn) {
-            confirmBtn.click();
-          }
-        }, 300);
-        break;
-      }
-
-      case 'start_order_tracking': {
-        const oid = agentState.orderId || localStorage.getItem('active_order_id');
-        if (oid) startOrderTracking(oid, (status) => {
-          setOrderStatus(status);
-        });
-        break;
-      }
-
-      case 'request_feedback': {
-        setFlowStage('FEEDBACK');
-        break;
-      }
-
-      default:
-        console.warn('[VoiceAgent] Unknown ui_action:', a, action);
-    }
-  }, [agentState, navigate, cart, addToCart, removeCartItem, setIsCartOpen,
-      setCustomerInfo, setFlowStage, setOrderType, setTableNumber, setCartTableNumber,
-      setOrderStatus, startOrderTracking, fetchMenuItems, setActiveCategory]);
-
-  // ── Main process function ─────────────────────────────────────────────────
-  const processInput = useCallback(async (textPrompt, audioBase64 = null) => {
-    if (textPrompt && !textPrompt.startsWith('[SYSTEM')) {
-      setMessages(prev => [...prev, { role: 'user', content: textPrompt }]);
-      const lang = detectLanguage(textPrompt);
-      if (lang !== agentState.detectedLanguage) setDetectedLanguage(lang);
-    }
-
-    setIsLoading(true);
-    setMicState('PROCESSING');
-    stopAudioPlayback();
-    cleanupMic();
-
-    requestCounterRef.current += 1;
-    const seq = requestCounterRef.current;
-
-    try {
-      const response = await sendToCustomerMCP({
-        prompt: textPrompt || (audioBase64 ? '[SYSTEM NOTE: User spoke via mic. Transcribe and respond.]' : ''),
-        chatHistory: messages.slice(-12),
-        audioBase64,
-        isVoice: true,
-        restaurantId: parseInt(localStorage.getItem('selected_restaurant_id')) || 1,
-        orderId: agentState.orderId || localStorage.getItem('active_order_id'),
-        currentPage: window.location.pathname,
-        orderType: agentState.orderType,
-        cartData: cart,
-        customerName: agentState.customerName,
-        customerPhone: agentState.mobileNumber,
-        flowStage: agentState.flowStage,
-        tableNumber: agentState.tableNumber,
-        paymentStatus: agentState.paymentStatus,
-        orderStatus: agentState.orderStatus,
-        detectedLanguage: agentState.detectedLanguage,
-        sessionId: agentState.conversationSessionId,
-      });
-
-      if (seq !== requestCounterRef.current) return;
-
-      // Handle invalid speech / empty transcription
-      if (audioBase64 && (!response.transcribed_user_text || !response.transcribed_user_text.trim())) {
-        const fallbackText = "Sorry, I couldn't hear that. Please try again.";
-        setMessages(prev => [...prev, { role: 'model', content: fallbackText }]);
-        const afterSpeak = () => {
-          if (isVoiceModeRef.current && seq === requestCounterRef.current) {
-            setMicState('LISTENING');
-            setTimeout(() => startListening(), 300);
-          } else {
-            setMicState('IDLE');
-          }
-        };
-        if (!isMuted) {
-          speakFallback(fallbackText, afterSpeak);
-        } else {
-          afterSpeak();
-        }
-        return;
-      }
-
-      // Update messages
-      if (response.assistant_text) {
-        setMessages(prev => {
-          const next = [...prev];
-          if (audioBase64 && response.transcribed_user_text) {
-            next.push({ role: 'user', content: response.transcribed_user_text });
-            const lang = detectLanguage(response.transcribed_user_text);
-            if (lang !== agentState.detectedLanguage) setDetectedLanguage(lang);
-          }
-          next.push({ role: 'model', content: response.assistant_text });
-          return next;
-        });
-      }
-
-      // Execute all ui_actions
-      const freshMenu = await fetchMenuItems();
-      if (response.ui_actions && Array.isArray(response.ui_actions)) {
-        for (const actionObj of response.ui_actions) {
-          await handleUIAction(actionObj, freshMenu);
-        }
-      }
-
-      // Speak the response
-      const afterSpeak = () => {
-        if (isVoiceModeRef.current && seq === requestCounterRef.current) {
-          setMicState('LISTENING');
-          setTimeout(() => startListening(), 300);
-        } else {
-          setMicState('IDLE');
-        }
-      };
-
-      if (response.audio_payload && !isMuted) {
-        stopAudioPlayback();
-        const audio = new Audio(`data:audio/mp3;base64,${response.audio_payload}`);
-        currentAudioRef.current = audio;
-        audio.playbackRate = 1.15;
-        setIsSpeaking(true);
-        isSpeakingRef.current = true;
-        setMicState('SPEAKING');
-        audio.onended = () => { setIsSpeaking(false); isSpeakingRef.current = false; setMicState('IDLE'); afterSpeak(); };
-        audio.play().catch(() => speakFallback(response.assistant_text, afterSpeak));
-      } else if (response.assistant_text && !isMuted) {
-        speakFallback(response.assistant_text, afterSpeak);
-      } else {
-        afterSpeak();
-      }
-
-    } catch (err) {
-      if (seq !== requestCounterRef.current) return;
-      console.error('[VoiceAgent] MCP error:', err);
-      setMessages(prev => [...prev, { role: 'model', content: 'Oops! Something went wrong. Please try again.' }]);
-      if (isVoiceModeRef.current && !isSpeakingRef.current) {
-        setTimeout(() => startListening(), 1000);
-      }
-    } finally {
-      if (seq === requestCounterRef.current) {
-        setIsLoading(false);
-        isProcessingVoiceRef.current = false;
-      }
-    }
-  }, [
-    messages, agentState, cart, isMuted, isVoiceMode,
-    handleUIAction, fetchMenuItems, speakFallback, stopAudioPlayback,
-    startListening, detectLanguage, setDetectedLanguage, cleanupMic, setMessages,
-  ]);
-
-  useEffect(() => {
-    processInputRef.current = processInput;
-  }, [processInput]);
-
+  // ── Text-chat send (typing fallback) ──────────────────────────────────────
   const handleSend = () => {
     if (!inputText.trim()) return;
-    const text = inputText;
+    const text = inputText.trim();
     setInputText('');
-    processInput(text);
+    
+    // Start assistant if not connected
+    if (!isConnected && !isConnecting && isConfigured) {
+      startAssistant();
+    }
+    
+    // Add user message to conversation display immediately
+    setMessages(prev => [...prev, { role: 'user', content: text }]);
+    
+    // Send to Vapi
+    sendVapiMessage({
+      type: 'add-message',
+      message: {
+        role: 'user',
+        content: text
+      }
+    });
   };
 
-  const handleVoiceSend = () => {
-    // Deprecated: voice submits automatically via silence detection.
-  };
-
-  const toggleSidebar = () => {
+  // ── Toggle sidebar ────────────────────────────────────────────────────────
+  const toggleSidebar = useCallback(() => {
     if (isOpen) {
       setIsOpen(false);
-      stopListening();
+      // Stop Vapi call when overlay is closed
+      if (isConnected || isConnecting) {
+        stopAssistant();
+      }
     } else {
       setIsOpen(true);
-      if (isVoiceMode) {
-        setMicState('LISTENING');
-        setTimeout(() => startListening(), 100);
+      if (isVoiceMode && isConfigured) {
+        // Small delay so overlay finishes animating open
+        setTimeout(() => startAssistant(), 300);
+      }
+    }
+  }, [isOpen, isConnected, isConnecting, isVoiceMode, isConfigured, startAssistant, stopAssistant, setIsOpen]);
+
+  // ── Switch between voice and typing mode ─────────────────────────────────
+  const handleToggleMode = () => {
+    if (isVoiceMode) {
+      // Switch to typing — mute the mic instead of stopping
+      setIsVoiceMode(false);
+      muteVapiCall(true);
+    } else {
+      // Switch to voice — unmute
+      setIsVoiceMode(true);
+      muteVapiCall(false);
+      if (isConfigured && !isConnected && !isConnecting) {
+        setTimeout(() => startAssistant(), 100);
       }
     }
   };
 
   // ── Don't render on the voice-agent page ──────────────────────────────────
   if (location.pathname === '/agent') return null;
+
+  // ── Config error banner text ──────────────────────────────────────────────
+  const configError = !isConfigured ? getVapiConfigError() : null;
+  const displayError = vapiError || configError;
+
+  // ── Status label for voice input display ─────────────────────────────────
+  const voicePlaceholder =
+    micState === 'PROCESSING'   ? 'Connecting...' :
+    micState === 'SPEAKING'     ? 'Agent is responding...' :
+    micState === 'LISTENING'    ? 'Listening... Speak now' :
+    displayError                ? displayError :
+                                  'Tap mic to speak';
 
   return (
     <>
@@ -741,7 +290,7 @@ const AIAssistantOverlay = () => {
               <button className="ai-close-x" onClick={toggleSidebar}>&times;</button>
             </header>
 
-            {/* Mascot */}
+            {/* Mascot / waveform */}
             {isVoiceMode && (
               <div className="ai-namaste-wrap-original">
                 <div className="ai-waveform-bg">
@@ -753,6 +302,21 @@ const AIAssistantOverlay = () => {
               </div>
             )}
           </div>
+
+          {/* Configuration warning banner */}
+          {displayError && (
+            <div style={{
+              margin: '8px 16px 0',
+              padding: '10px 14px',
+              background: '#fff3cd',
+              border: '1px solid #ffc107',
+              borderRadius: '10px',
+              fontSize: '13px',
+              color: '#856404',
+            }}>
+              ⚠ {displayError}
+            </div>
+          )}
 
           {/* Messages */}
           <div className="ai-chat-messages" style={{
@@ -801,7 +365,8 @@ const AIAssistantOverlay = () => {
                 ))
             )}
 
-            {isLoading && (
+            {/* Connecting / processing indicator */}
+            {(micState === 'PROCESSING') && (
               <div className="ai-msg-container model" style={{ display: 'flex', gap: '12px', animation: 'aiMsgIn 0.3s ease-out' }}>
                 <div style={{
                   width: '36px', height: '36px', borderRadius: '50%', background: 'white',
@@ -822,17 +387,8 @@ const AIAssistantOverlay = () => {
               {/* Mic / Keyboard Toggle Button */}
               <button
                 type="button"
-                onClick={() => {
-                  if (isVoiceMode) {
-                    setIsVoiceMode(false);
-                    stopListening();
-                    setMicState('IDLE');
-                  } else {
-                    setIsVoiceMode(true);
-                    setMicState('LISTENING');
-                    setTimeout(() => startListening(), 100);
-                  }
-                }}
+                id="voice-mode-toggle-btn"
+                onClick={handleToggleMode}
                 style={{
                   width: '36px',
                   height: '36px',
@@ -858,17 +414,13 @@ const AIAssistantOverlay = () => {
                   <>
                     <input
                       type="text"
-                      placeholder={
-                        micState === 'PROCESSING' ? 'Processing...' :
-                        micState === 'SPEAKING' ? 'Agent is responding...' :
-                        'Listening... Speak now'
-                      }
-                      value={inputText}
+                      placeholder={voicePlaceholder}
+                      value=""
                       readOnly
                       style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', padding: '0 4px', outline: 'none', fontSize: '13px', color: micState === 'PROCESSING' || micState === 'SPEAKING' ? '#888' : '#000' }}
                     />
                     {(micState === 'RECORDING' || micState === 'SPEAKING' || micState === 'LISTENING') && (
-                      <WaveSymbol active={micState === 'RECORDING' || micState === 'SPEAKING'} />
+                      <WaveSymbol active={micState === 'RECORDING' || micState === 'SPEAKING' || micState === 'LISTENING'} />
                     )}
                   </>
                 ) : (
@@ -878,39 +430,40 @@ const AIAssistantOverlay = () => {
                     value={inputText}
                     onChange={e => setInputText(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSend()}
-                    disabled={isLoading}
                     style={{ flex: 1, minWidth: 0, border: 'none', background: 'transparent', padding: '0 4px', outline: 'none', fontSize: '14px' }}
                   />
                 )}
               </div>
 
-              {/* Send button (works in both text mode and voice mode when recording/listening) */}
+              {/* Send / Mic button */}
               <button
                 type="button"
-                onClick={isVoiceMode ? handleVoiceSend : handleSend}
-                disabled={isVoiceMode ? true : (inputText.trim().length === 0 || isLoading)}
+                id="voice-send-btn"
+                onClick={isVoiceMode ? toggleAssistant : handleSend}
+                disabled={isVoiceMode ? (!isConfigured) : (inputText.trim().length === 0)}
                 style={{
                   width: '36px',
                   height: '36px',
                   borderRadius: '50%',
                   border: 'none',
                   background: isVoiceMode
-                    ? ((micState === 'RECORDING' || micState === 'LISTENING') ? '#ff4e00' : '#e0e0e0')
-                    : ((inputText.trim().length > 0 && !isLoading) ? '#ff4e00' : '#e0e0e0'),
+                    ? (isConnected ? '#ff4e00' : (isConnecting ? '#ffa07a' : (isConfigured ? '#ff4e00' : '#e0e0e0')))
+                    : (inputText.trim().length > 0 ? '#ff4e00' : '#e0e0e0'),
                   color: '#fff',
-                  cursor: isVoiceMode
-                    ? ((micState === 'RECORDING' || micState === 'LISTENING') ? 'pointer' : 'default')
-                    : ((inputText.trim().length > 0 && !isLoading) ? 'pointer' : 'default'),
+                  cursor: isVoiceMode ? (isConfigured ? 'pointer' : 'default') : (inputText.trim().length > 0 ? 'pointer' : 'default'),
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
                 }}
+                title={isVoiceMode ? (isConnected ? 'Stop voice call' : 'Start voice call') : 'Send message'}
               >
-                <i className="fa-solid fa-paper-plane" />
+                {isVoiceMode
+                  ? <i className={`fa-solid ${isConnected ? 'fa-stop' : 'fa-microphone'}`} />
+                  : <i className="fa-solid fa-paper-plane" />
+                }
               </button>
             </div>
-
           </div>
         </div>
       </div>
