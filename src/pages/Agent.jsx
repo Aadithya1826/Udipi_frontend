@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
 import { useCart } from '../context/CartContext'
+import { useVoiceAgent } from '../context/VoiceAgentContext'
 import Header from '../components/Header'
 import { fetchCategories, fetchItems, formatMenuData, placeOrder } from '../services/menuService'
 import { sendToCustomerMCP } from '../services/mcpCustomerService'
@@ -11,8 +12,9 @@ const agentwaiterLogoImg = `/assets/images/agentwaiter_logo.png`;
 function Agent() {
   const navigate = useNavigate()
   const { language, t } = useLanguage()
+  const { agentState, setCustomerInfo, setFlowStage } = useVoiceAgent()
   const [messages, setMessages] = useState([
-    { role: 'model', content: t('hello') }
+    { role: 'model', content: language === 'English' ? 'Welcome to Data Udipi! May I know your name?' : 'டேட்டா உடுப்பிக்கு உங்களை வரவேற்கிறோம்! உங்கள் பெயரைத் தெரிந்துகொள்ளலாமா?' }
   ])
   const [inputText, setInputText] = useState('')
   const [isListening, setIsListening] = useState(false)
@@ -54,6 +56,15 @@ function Agent() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    // Foolproof auto-navigation when both Name and Phone are collected
+    if (agentState.customerName && agentState.mobileNumber) {
+      const timer = setTimeout(() => {
+        navigate('/home');
+      }, 800); // Small delay to let 'Thank you.' TTS finish playing
+      return () => clearTimeout(timer);
+    }
+  }, [agentState.customerName, agentState.mobileNumber, navigate]);
 
   const [showMenu, setShowMenu] = useState(false)
   const [activeCategory, setActiveCategory] = useState('all')
@@ -95,60 +106,80 @@ function Agent() {
   }, [messages, showMenu, activeCategory, viewMode])
 
   // Speech Recognition Setup
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-  const recognition = SpeechRecognition ? new SpeechRecognition() : null
-
-  if (recognition) {
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = language === 'English' ? 'en-IN' : 'ta-IN';
-
-    recognition.onstart = () => {
-      setIsListening(true);
-      setMicToast(language === 'English' ? 'Listening...' : 'கேட்கிறது...');
-    };
-
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setInputText(transcript);
-      setMicToast('Speech captured!');
-      // Short delay to let user see their text before sending
-      setTimeout(() => {
-        handleSendMessage(transcript);
-        setMicToast('');
-      }, 800);
-    };
-
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error', event.error);
-      setIsListening(false);
-      setMicToast('Mic error. Please try again.');
-      setTimeout(() => setMicToast(''), 2000);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-      if (micToast === 'Listening...') setMicToast('');
-    };
-  }
-
-  const toggleListen = () => {
-    if (isListening) {
-      recognition?.stop();
-    } else {
-      recognition?.start();
-    }
-  };
+  const recognitionRef = useRef(null);
+  const isSpeakingRef = useRef(false);
+  const manualStopRef = useRef(false);
 
   useEffect(() => {
-    if (recognition && !isListening) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition && !recognitionRef.current) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = language === 'English' ? 'en-IN' : 'ta-IN';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setMicToast(language === 'English' ? 'Listening...' : 'கேட்கிறது...');
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInputText(transcript);
+        setMicToast('Speech captured!');
+        handleSendMessage(transcript);
+        setTimeout(() => setMicToast(''), 1000);
+      };
+
+      recognition.onerror = (event) => {
+        if (event.error !== 'aborted') {
+          console.error('Speech recognition error', event.error);
+          setMicToast('Mic error. Please try again.');
+          setTimeout(() => setMicToast(''), 2000);
+        }
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        setMicToast(prev => prev === 'Listening...' ? '' : prev);
+
+        // Auto-loop mic unless manually stopped or currently speaking
+        if (!isMutedRef.current && !isSpeakingRef.current && !manualStopRef.current && recognitionRef.current) {
+          setTimeout(() => {
+             if (!isMutedRef.current && !isSpeakingRef.current && !manualStopRef.current && recognitionRef.current) {
+                 try { recognitionRef.current.start(); } catch(e) {}
+             }
+          }, 500);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      
       try {
         recognition.start();
       } catch (err) {
         console.warn('Auto-start mic failed:', err);
       }
     }
-  }, []);
+
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch {}
+        recognitionRef.current = null;
+      }
+    };
+  }, [language]); // Re-initialize if language changes
+
+  const toggleListen = () => {
+    if (isListening) {
+      manualStopRef.current = true;
+      recognitionRef.current?.stop();
+    } else {
+      manualStopRef.current = false;
+      recognitionRef.current?.start();
+    }
+  };
 
   const speakText = (text) => {
     if (isMutedRef.current || !window.speechSynthesis) return;
@@ -157,34 +188,46 @@ function Agent() {
 
     const utterance = new SpeechSynthesisUtterance(text);
 
+    utterance.onstart = () => {
+      isSpeakingRef.current = true;
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch(e) {}
+      }
+    };
+    
+    utterance.onend = () => {
+      isSpeakingRef.current = false;
+      if (!isMutedRef.current && recognitionRef.current && !manualStopRef.current) {
+        setTimeout(() => {
+          if (!isSpeakingRef.current && !manualStopRef.current && recognitionRef.current) {
+             try { recognitionRef.current.start(); } catch(e) {}
+          }
+        }, 300);
+      }
+    };
+
     const voices = window.speechSynthesis.getVoices();
 
-    // Consistent Voice Selection throughout the app (Female voice preference)
+    // Consistent Voice Selection throughout the app (Male voice preference)
     const englishVoice = voices.find(v => {
       const n = v.name.toLowerCase();
       return v.lang.startsWith('en') && (
-        n.includes('google us english') ||
-        n.includes('google uk english female') ||
-        n.includes('sangeeta') ||
-        n.includes('zira') ||
-        n.includes('samantha') ||
-        n.includes('female') ||
-        n.includes('natural')
-      );
-    }) || voices.find(v => v.lang.startsWith('en'));
+        n.includes('male') ||
+        n.includes('david') ||
+        n.includes('mark') ||
+        n.includes('george') ||
+        n.includes('brian') ||
+        n.includes('prabhat')
+      ) && !n.includes('female');
+    }) || voices.find(v => v.lang.startsWith('en') && !v.name.toLowerCase().includes('female')) || voices.find(v => v.lang.startsWith('en'));
 
     const tamilVoice = voices.find(v => {
       const n = v.name.toLowerCase();
       return v.lang.startsWith('ta') && (
-        n.includes('google') ||
         n.includes('valluvar') ||
-        n.includes('natural') ||
-        n.includes('female') ||
-        n.includes('sangeeta') ||
-        n.includes('vani') ||
-        n.includes('latha')
-      );
-    }) || voices.find(v => v.lang.startsWith('ta'));
+        n.includes('male')
+      ) && !n.includes('female');
+    }) || voices.find(v => v.lang.startsWith('ta') && !v.name.toLowerCase().includes('female')) || voices.find(v => v.lang.startsWith('ta'));
 
     const hasTamil = /[\u0b80-\u0bff]/.test(text);
     const hasHindi = /[\u0900-\u097f]/.test(text);
@@ -236,6 +279,16 @@ function Agent() {
     window.speechSynthesis.speak(utterance);
   }
 
+  // Auto-greet on mount
+  useEffect(() => {
+    const greeting = language === 'English' ? 'Welcome to Data Udipi! May I know your name?' : 'டேட்டா உடுப்பிக்கு உங்களை வரவேற்கிறோம்! உங்கள் பெயரைத் தெரிந்துகொள்ளலாமா?';
+    const timer = setTimeout(() => {
+      speakText(greeting);
+    }, 1000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [language]);
+
   const handleSendMessage = async (textToSubmit = inputText) => {
     if (!textToSubmit.trim()) return;
 
@@ -262,7 +315,12 @@ function Agent() {
         chatHistory: updatedMessages.slice(0, -1).map(m => ({ role: m.role === 'model' ? 'assistant' : 'user', text: m.content })),
         isVoice: false,
         restaurantId: parseInt(localStorage.getItem('selected_restaurant_id')) || 1,
-        orderId: localStorage.getItem('active_order_id')
+        orderId: localStorage.getItem('active_order_id'),
+        currentPage: '/',
+        flowStage: agentState.flowStage,
+        customerName: agentState.customerName,
+        customerPhone: agentState.mobileNumber,
+        sessionId: agentState.conversationSessionId
       });
 
       if (response.assistant_text) {
@@ -298,15 +356,20 @@ function Agent() {
            setMessages(prev => [...prev, { role: 'model', type: 'review' }]);
         }
         else if (actionType === 'set_customer' || actionType === 'update_name') {
+           const newInfo = {};
            if (actionObj.name || actionObj.customer_name) {
               setCustomerName(actionObj.name || actionObj.customer_name);
-              // As requested: "if the user name is asked then it should navigate to checkout"
-              if (orderType.includes('takeaway') || orderType.includes('take-away')) {
-                 navigate('/takeaway-checkout');
-              } else {
-                 navigate('/checkout');
-              }
+              newInfo.name = actionObj.name || actionObj.customer_name;
            }
+           if (actionObj.phone || actionObj.customer_phone) {
+              newInfo.phone = actionObj.phone || actionObj.customer_phone;
+           }
+           if (Object.keys(newInfo).length > 0) {
+              setCustomerInfo(newInfo);
+           }
+        }
+        else if (actionType === 'set_flow_stage') {
+           setFlowStage(actionObj.stage || actionObj.flow_stage);
         }
         else if (actionType === 'payment_method' || actionType === 'proceed_to_payment') {
            // Ask payment mode and then go to live order status
@@ -321,7 +384,10 @@ function Agent() {
         }
         else if (actionType === 'navigate' || actionType === 'navigate_to_page') {
            const page = (actionObj.page || '').toLowerCase();
-           if (page === 'checkout' || page === 'cart') {
+           if (page === 'home') {
+               setTimeout(() => navigate('/home'), 800);
+           }
+           else if (page === 'checkout' || page === 'cart') {
                navigate(orderType.includes('takeaway') || orderType.includes('take-away') ? '/takeaway-checkout' : '/checkout');
            } else if (page === 'dine-in') navigate('/dine-in');
            else if (page === 'takeaway' || page === 'take-away') navigate('/take-away');
@@ -410,14 +476,24 @@ function Agent() {
   // Listeners moved to handleSendMessage hooks directly where API bypass is needed.
 
   return (
-    <div className="app-container">
-      <div className="background-image"></div>
-      <Header tableNumber="06" showFullHeader={true} useTitleImage={true} />
+    <div className="app-container landing-page-container">
+      <div className="background-image landing-bg"></div>
+      <Header hideTableIndicator={true} showFullHeader={true} useTitleImage={true}>
+         <button className="switch-manual-btn" onClick={() => navigate('/home')}>
+           <i className="fa-solid fa-hand-pointer"></i> Switch to Manual
+         </button>
+      </Header>
 
+      <main className="landing-page-content">
+        
+        <div className="landing-chat-wrapper">
+          <div className="landing-center-mascot">
+            <div className="waveform-bg"></div>
+            <div className="mascot-wrapper">
+               <img src="/assets/images/waiter.png" alt="Chef Mascot" className="landing-mascot-img" />
+            </div>
+          </div>
 
-
-      <main className="agent-page-content">
-        <div className="agent-chat-container">
           <div className="chat-messages">
             {messages.map((msg, idx) => (
               <div key={idx} className={`message ${msg.role === 'model' ? 'bot-message' : 'user-message'}`}>
@@ -675,45 +751,45 @@ function Agent() {
           )}
 
           <div className="chat-input-wrapper">
-            <div className="chat-input-box" style={{ padding: '0 10px' }}>
+            <div className="chat-input-box">
+              <span className="waveform-indicator" style={{ display: isListening ? 'inline-block' : 'none', color: '#ff4e00', marginRight: '10px' }}>
+                <i className="fa-solid fa-waveform-lines" style={{ fontSize: '18px' }}></i>
+              </span>
               <input
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder={isListening ? "Listening..." : "Type or speak your order..."}
+                placeholder={isListening ? 
+                  (agentState.customerName ? "Listening for your mobile number..." : "Listening for your name...") 
+                  : "Listening..."}
                 style={{
                   flex: 1,
                   border: 'none',
                   outline: 'none',
                   background: 'transparent',
-                  padding: '10px',
-                  fontSize: '1.05rem'
+                  padding: '15px 10px',
+                  fontSize: '1.05rem',
+                  color: '#333'
                 }}
               />
               <button
                 className={`mic-btn ${isListening ? 'pulse-anim' : ''}`}
                 onClick={toggleListen}
-                style={{ background: isListening ? '#ec1c24' : '#ff4e00', marginLeft: '10px' }}
+                style={{ background: '#ec1c24', color: 'white', border: 'none', width: '38px', height: '38px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
-                <i className={`fa-solid ${isListening ? 'fa-stop' : 'fa-microphone'}`}></i>
-              </button>
-              <button
-                className="mic-btn"
-                onClick={() => handleSendMessage()}
-                style={{ marginLeft: '10px', background: '#1a7a3b' }}
-              >
-                <i className="fa-solid fa-paper-plane"></i>
+                <i className={`fa-solid ${isListening ? 'fa-microphone' : 'fa-microphone-slash'}`}></i>
               </button>
             </div>
-            <button
-              className="mute-btn"
-              onClick={() => setIsMuted(!isMuted)}
-              style={{ color: isMuted ? '#ec1c24' : '#666' }}
-            >
-              <i className={`fa-solid ${isMuted ? 'fa-volume-xmark' : 'fa-volume-high'}`}></i>
-            </button>
           </div>
+
+          <button
+            className="mute-btn"
+            onClick={() => setIsMuted(!isMuted)}
+            style={{ color: isMuted ? '#ec1c24' : '#666' }}
+          >
+            <i className={`fa-solid ${isMuted ? 'fa-volume-xmark' : 'fa-volume-high'}`}></i>
+          </button>
 
           {/* Bottom Fixed Summary Bar - Only show when cart has items */}
           {cart.length > 0 && (

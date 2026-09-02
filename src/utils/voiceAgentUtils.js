@@ -106,7 +106,8 @@ export function derivePageContext(pathname) {
   if (p.includes('takeaway-checkout'))                     return { page: 'CHECKOUT',       orderType: 'takeaway' };
   if (p.includes('/checkout'))                             return { page: 'CHECKOUT',       orderType: 'dine-in'  };
   if (p === '/invoice')                                    return { page: 'INVOICE',        orderType: null };
-  if (p === '/agent')                                      return { page: 'AGENT',          orderType: null };
+  if (p === '/home')                                       return { page: 'HOME',           orderType: null };
+  if (p === '/')                                           return { page: 'LANDING',        orderType: null };
   return { page: 'HOME', orderType: null };
 }
 
@@ -123,9 +124,12 @@ export function getInitialGreetingForPage(pageCtx, agentState) {
     case 'CHECKOUT':
     case 'INVOICE':
       return null; // no auto-greet on these pages
+    case 'LANDING':
+      return '[SYSTEM: Customer is on the Landing page. flowStage=GREETING. Greet warmly and ask for their name. Do NOT ask whether they prefer Dine-In or Takeaway yet.]';
     case 'HOME':
+      return `[SYSTEM: Customer is on the Home page. flowStage=SELECT_ORDER_TYPE. Greet the customer by their name (${agentState?.customerName || 'Customer'}) and explicitly ask "Would you prefer Dine-In or Takeaway?"]`;
     default:
-      return '[SYSTEM: Customer is on the Home page. flowStage=GREETING. Greet warmly and ask whether they prefer Dine-In or Takeaway.]';
+      return null;
   }
 }
 
@@ -137,6 +141,9 @@ export function getFlowStageForPage(pageCtx, currentStage) {
   if (page === 'CHECKOUT') return 'CHECKOUT_REVIEW';
   if (page === 'PAYMENT') return currentStage === 'PAYMENT_PROCESSING' ? currentStage : 'PAYMENT_SELECT';
   if (page === 'ORDER_SUCCESS') return currentStage === 'ORDER_TRACKING' ? currentStage : 'ORDER_PLACED';
+
+  if (page === 'HOME') return 'SELECT_ORDER_TYPE';
+  if (page === 'LANDING') return 'GREETING';
 
   // Never override terminal stages if on generic pages
   if (['ORDER_PLACED', 'LIVE_ORDER', 'ORDER_SERVED', 'FEEDBACK', 'COMPLETED'].includes(currentStage)) {

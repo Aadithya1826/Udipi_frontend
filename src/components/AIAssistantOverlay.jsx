@@ -136,6 +136,7 @@ const AIAssistantOverlay = () => {
 
   // ── Auto-open and greet ────────────────────────────────────────────────────
   useEffect(() => {
+    if (location.pathname === '/') return;
     const isSuccessPage = location.pathname.includes('order-success');
     if (!agentState.isGreeted && !isSuccessPage) {
       setIsGreeted(true);
@@ -144,10 +145,11 @@ const AIAssistantOverlay = () => {
       const pageCtx = derivePageContext(location.pathname);
       const initialGreeting = getInitialGreetingForPage(pageCtx, agentState) ||
         '[SYSTEM: Start the ordering journey. Greet the customer warmly, welcome them to Data Udipi, and ask for their name. flow_stage=GREETING]';
-      const t = setTimeout(() => {
+      
+      // Do not clear this timeout on cleanup, otherwise the re-render from setIsGreeted will cancel it.
+      setTimeout(() => {
         processInput(initialGreeting);
       }, 600);
-      return () => clearTimeout(t);
     }
   }, [agentState.isGreeted, location.pathname, setIsGreeted, agentState]);
 
@@ -220,8 +222,16 @@ const AIAssistantOverlay = () => {
       punjabi: 'pa', english: 'en',
     };
     const bcp = langMap[lang] || 'en';
-    const voice = voices.find(v => v.lang.startsWith(bcp)) ||
-                  voices.find(v => v.lang.startsWith('en'));
+    
+    // Male voice preference
+    const findMaleVoice = (langPrefix) => {
+      return voices.find(v => {
+        const n = v.name.toLowerCase();
+        return v.lang.startsWith(langPrefix) && (n.includes('male') || n.includes('david') || n.includes('mark') || n.includes('valluvar') || n.includes('prabhat')) && !n.includes('female');
+      }) || voices.find(v => v.lang.startsWith(langPrefix) && !v.name.toLowerCase().includes('female')) || voices.find(v => v.lang.startsWith(langPrefix));
+    };
+
+    const voice = findMaleVoice(bcp) || findMaleVoice('en');
     if (voice) utter.voice = voice;
     utter.lang = `${bcp}-IN`;
     utter.onend = () => { setIsSpeaking(false); isSpeakingRef.current = false; setMicState('IDLE'); onEnd?.(); };
@@ -247,7 +257,6 @@ const AIAssistantOverlay = () => {
     cleanupMic();
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch {}
-      recognitionRef.current = null;
     }
     setMicState('IDLE');
   }, [cleanupMic]);
@@ -255,6 +264,7 @@ const AIAssistantOverlay = () => {
   // ── (Removed outside click interference so agent keeps listening) ──────────
 
   const startListening = useCallback(() => {
+    if (location.pathname === '/') return;
     if (isSpeakingRef.current || isProcessingVoiceRef.current) return;
     stopAudioPlayback();
     cleanupMic();
@@ -263,6 +273,12 @@ const AIAssistantOverlay = () => {
     hasSpeechStartedRef.current = false;
     transcriptRef.current = '';
 
+    if (recognitionRef.current) {
+      try { recognitionRef.current.start(); } catch(e) {}
+    }
+  }, [stopAudioPlayback, cleanupMic, location.pathname]);
+
+  useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       setMessages(prev => [...prev, { role: 'model', content: 'Speech recognition is not supported in this browser. Please type your message.' }]);
@@ -271,10 +287,10 @@ const AIAssistantOverlay = () => {
       return;
     }
 
-    try {
+    if (!recognitionRef.current) {
       const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
+      recognition.continuous = false;
+      recognition.interimResults = false;
       // Use Indian English by default for optimal recognition of local dishes (e.g. Idly, Dosa, Parcel)
       recognition.lang = 'en-IN';
       
@@ -283,26 +299,11 @@ const AIAssistantOverlay = () => {
       };
 
       recognition.onresult = (event) => {
-        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-
-        let combined = '';
-        for (let i = 0; i < event.results.length; ++i) {
-          combined += event.results[i][0].transcript;
-        }
-        
-        combined = combined.trim();
-        if (combined) {
-          if (!hasSpeechStartedRef.current) {
-            hasSpeechStartedRef.current = true;
-            setMicState('RECORDING');
-          }
-          transcriptRef.current = combined;
-          setInputText(combined);
-
-          silenceTimerRef.current = setTimeout(() => {
-            shouldSubmitRef.current = true;
-            recognition.stop();
-          }, SILENCE_TIMEOUT); // Use configured SILENCE_TIMEOUT for snappier responses
+        const transcript = event.results[0][0].transcript.trim();
+        if (transcript) {
+          transcriptRef.current = transcript;
+          setInputText(transcript);
+          shouldSubmitRef.current = true;
         }
       };
 
@@ -331,19 +332,27 @@ const AIAssistantOverlay = () => {
             shouldSubmitRef.current = false;
             if (isVoiceModeRef.current && !isSpeakingRef.current) {
               setMicState('LISTENING');
-              setTimeout(() => startListening(), 300);
+              setTimeout(() => {
+                 if (recognitionRef.current && !isSpeakingRef.current) {
+                     try { recognitionRef.current.start(); } catch(e) {}
+                 }
+              }, 300);
             }
           }
         } else {
           // Browser stopped it naturally, or user clicked mic off. Restart if still in voice mode.
           if (isVoiceModeRef.current && !isSpeakingRef.current && !isProcessingVoiceRef.current) {
-            setTimeout(() => startListening(), 300);
+            setTimeout(() => {
+               if (recognitionRef.current && !isSpeakingRef.current && !isProcessingVoiceRef.current) {
+                   try { recognitionRef.current.start(); } catch(e) {}
+               }
+            }, 300);
           }
         }
       };
 
       recognition.onerror = (event) => {
-        console.error('Speech recognition error:', event.error);
+        if (event.error !== 'aborted') console.error('Speech recognition error:', event.error);
         if (event.error === 'not-allowed') {
           setMessages(prev => [...prev, { role: 'model', content: 'Microphone access denied. Please type your message.' }]);
           setIsVoiceMode(false);
@@ -352,11 +361,16 @@ const AIAssistantOverlay = () => {
       };
 
       recognitionRef.current = recognition;
-      recognition.start();
-    } catch (err) {
-      console.error('Mic initialization error:', err);
     }
-  }, [stopAudioPlayback, cleanupMic, agentState.detectedLanguage, setMessages, setIsVoiceMode]);
+
+    return () => {
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch {}
+        recognitionRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
 
   // ── Fetch fresh menu items for cart matching ──────────────────────────────
   const fetchMenuItems = useCallback(async () => {
@@ -422,7 +436,8 @@ const AIAssistantOverlay = () => {
         else if (page === 'take-away' || page === 'takeaway')  navigate('/take-away');
         else if (page === 'checkout' || page === 'cart')       navigate(agentState.orderType === 'takeaway' ? '/takeaway-checkout' : '/checkout');
         else if (page === 'payment')                           navigate(agentState.orderType === 'takeaway' ? '/takeaway-payment' : '/payment');
-        else if (page === 'home')                              navigate('/');
+        else if (page === 'home')                              navigate('/home');
+        else if (page === 'landing' || page === '/')           navigate('/');
         else if (action.page) {
           const categoryName = action.page.trim();
           const lowerName = categoryName.toLowerCase();
@@ -704,8 +719,8 @@ const AIAssistantOverlay = () => {
     }
   };
 
-  // ── Don't render on the voice-agent page ──────────────────────────────────
-  if (location.pathname === '/agent') return null;
+  // ── Don't render on the landing page ──────────────────────────────────
+  if (location.pathname === '/') return null;
 
   return (
     <>
@@ -738,7 +753,7 @@ const AIAssistantOverlay = () => {
           <div className="ai-hero-frosted-original" style={{ height: isVoiceMode ? '270px' : '110px', transition: 'height 0.3s ease' }}>
             <header className="ai-unified-header">
               <span>Talk To Your Agent</span>
-              <button className="ai-close-x" onClick={toggleSidebar}>&times;</button>
+              {/* Close button removed to keep agent open permanently */}
             </header>
 
             {/* Mascot */}
