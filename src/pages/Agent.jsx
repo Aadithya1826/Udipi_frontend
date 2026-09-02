@@ -37,7 +37,7 @@ function Agent() {
   const [allItems, setAllItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [orderType, setOrderType] = useState(() => localStorage.getItem('active_order_type') || '');
-  const [customerName, setCustomerName] = useState('');
+  const [customerName, setCustomerName] = useState(() => sessionStorage.getItem('customer_name') || '');
 
   useEffect(() => {
     async function loadData() {
@@ -84,7 +84,7 @@ function Agent() {
   // Checkout & Mobile Flow State
   const [isAwaitingMobile, setIsAwaitingMobile] = useState(false)
   const [isAwaitingPayment, setIsAwaitingPayment] = useState(false)
-  const [mobileNumber, setMobileNumber] = useState('')
+  const [mobileNumber, setMobileNumber] = useState(() => sessionStorage.getItem('customer_phone') || '')
   const [finalInvoiceData, setFinalInvoiceData] = useState(null)
 
   const messagesEndRef = useRef(null)
@@ -109,6 +109,17 @@ function Agent() {
   const recognitionRef = useRef(null);
   const isSpeakingRef = useRef(false);
   const manualStopRef = useRef(false);
+  const handleSendMessageRef = useRef(null);
+  const agentStateRef = useRef(agentState);
+  const messagesRef = useRef(messages);
+
+  useEffect(() => {
+    agentStateRef.current = agentState;
+  }, [agentState]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -127,7 +138,9 @@ function Agent() {
         const transcript = event.results[0][0].transcript;
         setInputText(transcript);
         setMicToast('Speech captured!');
-        handleSendMessage(transcript);
+        if (handleSendMessageRef.current) {
+          handleSendMessageRef.current(transcript);
+        }
         setTimeout(() => setMicToast(''), 1000);
       };
 
@@ -290,24 +303,35 @@ function Agent() {
   }, [language]);
 
   const handleSendMessage = async (textToSubmit = inputText) => {
-    if (!textToSubmit.trim()) return;
+    if (!textToSubmit || !textToSubmit.trim()) return;
 
     // Direct check for "show menu"
     if (textToSubmit.toLowerCase().includes('show menu')) {
       setShowMenu(true);
       setViewMode('grid');
       const localResponse = "Certainly! Here are our menu categories.";
-      setMessages(prev => [...prev, { role: 'user', content: textToSubmit }, { role: 'model', content: localResponse }]);
+      setMessages(prev => {
+        const next = [...prev, { role: 'user', content: textToSubmit }, { role: 'model', content: localResponse }];
+        messagesRef.current = next;
+        return next;
+      });
       speakText(localResponse);
       setInputText('');
       return;
     }
 
+    const currentMessages = messagesRef.current || messages;
+    const currentAgentState = agentStateRef.current || agentState;
     const userMessage = { role: 'user', content: textToSubmit };
-    const updatedMessages = [...messages, userMessage];
+    const updatedMessages = [...currentMessages, userMessage];
     setMessages(updatedMessages);
+    messagesRef.current = updatedMessages;
     setInputText('');
     setIsLoading(true);
+
+    const effectiveName = currentAgentState.customerName || sessionStorage.getItem('customer_name') || customerName || null;
+    const effectivePhone = currentAgentState.mobileNumber || sessionStorage.getItem('customer_phone') || mobileNumber || null;
+    const effectiveStage = currentAgentState.flowStage || (effectiveName && !effectivePhone ? 'COLLECT_PHONE' : (effectiveName && effectivePhone ? 'SELECT_ORDER_TYPE' : 'GREETING'));
 
     try {
       const response = await sendToCustomerMCP({
@@ -317,14 +341,18 @@ function Agent() {
         restaurantId: parseInt(localStorage.getItem('selected_restaurant_id')) || 1,
         orderId: localStorage.getItem('active_order_id'),
         currentPage: '/',
-        flowStage: agentState.flowStage,
-        customerName: agentState.customerName,
-        customerPhone: agentState.mobileNumber,
-        sessionId: agentState.conversationSessionId
+        flowStage: effectiveStage,
+        customerName: effectiveName,
+        customerPhone: effectivePhone,
+        sessionId: currentAgentState.conversationSessionId
       });
 
       if (response.assistant_text) {
-        setMessages(prev => [...prev, { role: 'model', content: response.assistant_text }]);
+        setMessages(prev => {
+          const next = [...prev, { role: 'model', content: response.assistant_text }];
+          messagesRef.current = next;
+          return next;
+        });
         speakText(response.assistant_text);
       }
 
@@ -352,24 +380,39 @@ function Agent() {
         }
         else if (actionType === 'view_cart' || actionType === 'open_cart') {
            setShowMenu(false);
-           // Agent page doesn't have an explicit cart drawer by default in this scope, but we can set menu off
-           setMessages(prev => [...prev, { role: 'model', type: 'review' }]);
+           setMessages(prev => {
+             const next = [...prev, { role: 'model', type: 'review' }];
+             messagesRef.current = next;
+             return next;
+           });
         }
         else if (actionType === 'set_customer' || actionType === 'update_name') {
            const newInfo = {};
-           if (actionObj.name || actionObj.customer_name) {
-              setCustomerName(actionObj.name || actionObj.customer_name);
-              newInfo.name = actionObj.name || actionObj.customer_name;
+           const name = actionObj.name || actionObj.customer_name;
+           const phone = actionObj.phone || actionObj.customer_phone;
+           if (name) {
+              setCustomerName(name);
+              newInfo.name = name;
+              sessionStorage.setItem('customer_name', name);
            }
-           if (actionObj.phone || actionObj.customer_phone) {
-              newInfo.phone = actionObj.phone || actionObj.customer_phone;
+           if (phone) {
+              setMobileNumber(phone);
+              newInfo.phone = phone;
+              sessionStorage.setItem('customer_phone', phone);
            }
            if (Object.keys(newInfo).length > 0) {
               setCustomerInfo(newInfo);
+              if (agentStateRef.current) {
+                 agentStateRef.current = { ...agentStateRef.current, ...newInfo };
+              }
            }
         }
         else if (actionType === 'set_flow_stage') {
-           setFlowStage(actionObj.stage || actionObj.flow_stage);
+           const nextStage = actionObj.stage || actionObj.flow_stage;
+           setFlowStage(nextStage);
+           if (agentStateRef.current) {
+              agentStateRef.current = { ...agentStateRef.current, flowStage: nextStage };
+           }
         }
         else if (actionType === 'payment_method' || actionType === 'proceed_to_payment') {
            // Ask payment mode and then go to live order status
@@ -402,6 +445,7 @@ function Agent() {
       setIsLoading(false);
     }
   }
+  handleSendMessageRef.current = handleSendMessage;
 
   const handleCategoryClick = (category) => {
     setActiveCategory(category.id)

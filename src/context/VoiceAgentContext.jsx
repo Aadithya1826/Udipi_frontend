@@ -45,13 +45,13 @@ export const FLOW_STAGES = [
 
 // ── Valid stage transitions (application controls these) ──────────────────
 const VALID_TRANSITIONS = {
-  GREETING:            ['COLLECT_NAME', 'SELECT_ORDER_TYPE', 'ORDER_BUILDING', 'GREETING'],
-  SELECT_ORDER_TYPE:   ['ORDER_BUILDING', 'COLLECT_TABLE', 'COLLECT_NAME'],
+  GREETING:            ['COLLECT_NAME', 'COLLECT_PHONE', 'SELECT_ORDER_TYPE', 'ORDER_BUILDING', 'GREETING'],
+  SELECT_ORDER_TYPE:   ['ORDER_BUILDING', 'COLLECT_TABLE', 'COLLECT_NAME', 'COLLECT_PHONE'],
   ORDER_BUILDING:      ['ORDER_BUILDING', 'WAITING_FOR_ORDER_COMPLETION', 'COLLECT_TABLE', 'COLLECT_NAME', 'COLLECT_PHONE', 'REVIEW_ORDER', 'CHECKOUT_REVIEW'],
-  COLLECT_TABLE:       ['ORDER_BUILDING', 'COLLECT_NAME'],
-  COLLECT_NAME:        ['COLLECT_PHONE', 'ORDER_BUILDING'],
-  COLLECT_PHONE:       ['CONFIRM_CUSTOMER', 'CHECKOUT_REVIEW', 'ORDER_BUILDING'],
-  CONFIRM_CUSTOMER:    ['CHECKOUT_REVIEW', 'ORDER_BUILDING'],
+  COLLECT_TABLE:       ['ORDER_BUILDING', 'COLLECT_NAME', 'COLLECT_PHONE'],
+  COLLECT_NAME:        ['COLLECT_PHONE', 'SELECT_ORDER_TYPE', 'ORDER_BUILDING', 'GREETING', 'COLLECT_NAME'],
+  COLLECT_PHONE:       ['CONFIRM_CUSTOMER', 'CHECKOUT_REVIEW', 'ORDER_BUILDING', 'SELECT_ORDER_TYPE', 'GREETING', 'COLLECT_NAME', 'COLLECT_PHONE'],
+  CONFIRM_CUSTOMER:    ['CHECKOUT_REVIEW', 'ORDER_BUILDING', 'SELECT_ORDER_TYPE'],
   WAITING_FOR_ORDER_COMPLETION: ['REVIEW_ORDER', 'COLLECT_TABLE', 'COLLECT_NAME', 'COLLECT_PHONE', 'CHECKOUT_REVIEW'],
   REVIEW_ORDER:        ['CHECKOUT_REVIEW', 'ORDER_BUILDING'],
   CHECKOUT:            ['CHECKOUT_REVIEW', 'PAYMENT_SELECT'],
@@ -96,7 +96,10 @@ const INITIAL_STATE = {
 function loadFromSession() {
   try {
     const saved = sessionStorage.getItem(STORAGE_KEY);
-    if (saved) return { ...INITIAL_STATE, ...JSON.parse(saved) };
+    const parsed = saved ? JSON.parse(saved) : {};
+    const customerName = parsed.customerName || sessionStorage.getItem('customer_name') || null;
+    const mobileNumber = parsed.mobileNumber || sessionStorage.getItem('customer_phone') || null;
+    return { ...INITIAL_STATE, ...parsed, customerName, mobileNumber };
   } catch {}
   return { ...INITIAL_STATE };
 }
@@ -170,12 +173,21 @@ export function VoiceAgentProvider({ children }) {
   const setCustomerInfo = useCallback(({ name, phone }) => {
     const results = {};
     if (name) {
-      const r = extractName(name);
+      const r = extractName(name) || (typeof name === 'string' && name.trim().length >= 2 ? name.trim() : null);
       if (r) { results.customerName = r; sessionStorage.setItem('customer_name', r); }
     }
     if (phone) {
       const r = validateIndianPhone(phone);
-      if (r.valid) { results.mobileNumber = r.cleaned; sessionStorage.setItem('customer_phone', r.cleaned); }
+      if (r.valid) {
+        results.mobileNumber = r.cleaned;
+        sessionStorage.setItem('customer_phone', r.cleaned);
+      } else {
+        const digits = String(phone).replace(/\D/g, '');
+        if (digits.length === 10) {
+          results.mobileNumber = digits;
+          sessionStorage.setItem('customer_phone', digits);
+        }
+      }
     }
     if (Object.keys(results).length) persist(results);
     return results;

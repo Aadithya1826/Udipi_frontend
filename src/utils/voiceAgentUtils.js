@@ -143,7 +143,7 @@ export function getFlowStageForPage(pageCtx, currentStage) {
   if (page === 'ORDER_SUCCESS') return currentStage === 'ORDER_TRACKING' ? currentStage : 'ORDER_PLACED';
 
   if (page === 'HOME') return 'SELECT_ORDER_TYPE';
-  if (page === 'LANDING') return 'GREETING';
+  if (page === 'LANDING') return ['COLLECT_NAME', 'COLLECT_PHONE', 'SELECT_ORDER_TYPE'].includes(currentStage) ? currentStage : 'GREETING';
 
   // Never override terminal stages if on generic pages
   if (['ORDER_PLACED', 'LIVE_ORDER', 'ORDER_SERVED', 'FEEDBACK', 'COMPLETED'].includes(currentStage)) {
