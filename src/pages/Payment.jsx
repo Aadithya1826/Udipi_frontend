@@ -206,7 +206,7 @@ const Payment = () => {
         const rzpOrderRes = await fetch(`/api/create-razorpay-order`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ amount: total })
+          body: JSON.stringify({ amount: total, order_id: dbId })
         });
         if (rzpOrderRes.ok) {
           rzpOrder = await rzpOrderRes.json();

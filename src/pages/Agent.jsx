@@ -14,7 +14,7 @@ function Agent() {
   const { language, t } = useLanguage()
   const { agentState, setCustomerInfo, setFlowStage } = useVoiceAgent()
   const [messages, setMessages] = useState([
-    { role: 'model', content: language === 'English' ? 'Welcome to Data Udipi! May I know your name?' : 'டேட்டா உடுப்பிக்கு உங்களை வரவேற்கிறோம்! உங்கள் பெயரைத் தெரிந்துகொள்ளலாமா?' }
+    { role: 'model', content: language === 'English' ? 'Welcome to Data Udipi! Please tell me your name and mobile number.' : 'டேட்டா உடுப்பிக்கு உங்களை வரவேற்கிறோம்! தயவுசெய்து உங்கள் பெயர் மற்றும் தொலைபேசி எண்ணைக் கூறவும்.' }
   ])
   const [inputText, setInputText] = useState('')
   const [isListening, setIsListening] = useState(false)
@@ -294,7 +294,9 @@ function Agent() {
 
   // Auto-greet on mount
   useEffect(() => {
-    const greeting = language === 'English' ? 'Welcome to Data Udipi! May I know your name?' : 'டேட்டா உடுப்பிக்கு உங்களை வரவேற்கிறோம்! உங்கள் பெயரைத் தெரிந்துகொள்ளலாமா?';
+    const greeting = language === 'English' 
+      ? 'Welcome to Data Udipi! Please tell me your name and mobile number.' 
+      : 'டேட்டா உடுப்பிக்கு உங்களை வரவேற்கிறோம்! தயவுசெய்து உங்கள் பெயர் மற்றும் தொலைபேசி எண்ணைக் கூறவும்.';
     const timer = setTimeout(() => {
       speakText(greeting);
     }, 1000);
