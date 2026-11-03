@@ -13,6 +13,7 @@ import PaymentFailed from './pages/PaymentFailed'
 import TakeAwayPayment from './pages/TakeAwayPayment'
 import TakeAwayOrderSuccess from './pages/TakeAwayOrderSuccess'
 import Checkout from './pages/Checkout'
+import PrivacyPolicy from './pages/PrivacyPolicy'
 import { CartProvider } from './context/CartContext'
 import { VoiceAgentProvider } from './context/VoiceAgentContext'
 import AIAssistantOverlay from './components/AIAssistantOverlay'
@@ -29,7 +30,7 @@ function ActiveOrderRedirector() {
     const tableNumber = localStorage.getItem('active_table_number') || '06';
 
     if (activeOrderId) {
-      const isSuccessPage = location.pathname === '/order-success' || location.pathname === '/takeaway-order-success';
+      const isSuccessPage = location.pathname === '/order-success' || location.pathname === '/takeaway-order-success' || location.pathname === '/privacy-policy' || location.pathname === '/privacy';
       if (!isSuccessPage) {
         if (activeOrderType === 'takeaway') {
           navigate('/takeaway-order-success', { replace: true, state: { autoTrack: true, orderId: activeOrderId } });
@@ -41,6 +42,29 @@ function ActiveOrderRedirector() {
   }, [location.pathname, navigate]);
 
   return null;
+}
+
+function PrivacyCornerBadge() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  if (location.pathname === '/privacy-policy' || location.pathname === '/privacy') {
+    return null;
+  }
+
+  return (
+    <div
+      onClick={() => navigate('/privacy-policy')}
+      className="privacy-corner-badge"
+      title="DATA UDIPI Privacy Policy"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && navigate('/privacy-policy')}
+    >
+      <i className="fa-solid fa-shield-halved privacy-corner-icon"></i>
+      <span>Privacy Policy</span>
+    </div>
+  );
 }
 
 function App() {
@@ -63,9 +87,12 @@ function App() {
           <Route path="/takeaway-checkout" element={<ActiveOrderGuard><Checkout isTakeaway={true} /></ActiveOrderGuard>} />
           <Route path="/takeaway-payment" element={<ActiveOrderGuard><TakeAwayPayment /></ActiveOrderGuard>} />
           <Route path="/takeaway-order-success" element={<TakeAwayOrderSuccess />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
         </Routes>
         <ActiveOrderBanner />
         <AIAssistantOverlay />
+        <PrivacyCornerBadge />
         </CartProvider>
       </VoiceAgentProvider>
     </Router>

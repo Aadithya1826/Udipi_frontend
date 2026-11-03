@@ -102,3 +102,55 @@ input, textarea {
         padding: 0 !important;
     }
 }
+/* Privacy Policy Floating Badge (Bottom Right Corner) */
+.privacy-corner-badge {
+    position: fixed;
+    bottom: 16px;
+    right: 20px;
+    z-index: 9999;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(47, 136, 44, 0.35);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+    border-radius: 9999px;
+    padding: 6px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: 'Poppins', 'Montserrat', -apple-system, sans-serif;
+    color: #2F882C;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    user-select: none;
+}
+
+.privacy-corner-badge:hover {
+    background: #ffffff;
+    border-color: #2F882C;
+    color: #0F5E16;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(47, 136, 44, 0.25);
+}
+
+.privacy-corner-badge .privacy-corner-icon {
+    font-size: 0.85rem;
+    color: #2F882C;
+    transition: transform 0.2s ease;
+}
+
+.privacy-corner-badge:hover .privacy-corner-icon {
+    transform: scale(1.15);
+}
+
+@media (max-width: 768px) {
+    .privacy-corner-badge {
+        bottom: 12px;
+        right: 12px;
+        padding: 5px 12px;
+        font-size: 0.78rem;
+    }
+}
