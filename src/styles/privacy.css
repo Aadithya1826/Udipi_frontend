@@ -51,15 +51,28 @@
   padding: 14px 24px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   flex-shrink: 0;
+  position: relative;
 }
 
 .privacy-header-left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  z-index: 2;
+}
+
+.privacy-header-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 1;
 }
 
 .privacy-back-btn {
@@ -85,9 +98,12 @@
 }
 
 .privacy-brand-logo {
-  height: 34px;
+  height: 38px;
+  max-width: 60vw;
   width: auto;
+  object-fit: contain;
   cursor: pointer;
+  display: block;
 }
 
 .privacy-header-badge {
@@ -311,4 +327,5 @@
     font-size: 0.78rem;
     gap: 6px;
   }
-}
+}
+

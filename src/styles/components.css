@@ -76,27 +76,20 @@
 }
 
 .logo-sign.title-mode {
-    position: relative;
-    /* anchor positioning */
-    top: -0.5rem;
-    /* vertical alignment */
-    left: 10rem;
-    /* push it slightly from the left edge */
+    position: absolute;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
     margin-left: 0;
-    /* ensure no auto-centering */
-    text-align: left;
-    /* align text/logo to the left */
+    text-align: center;
     z-index: 10;
-    /* keep above background overlay */
 }
 
 
 .title-image-header {
     display: block;
-    margin-left: 0;
-    /* remove centering */
+    margin-left: auto;
     margin-right: auto;
-    /* push it left */
     width: 250px;
     max-width: 50vw;
     height: auto;

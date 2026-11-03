@@ -719,8 +719,8 @@ const AIAssistantOverlay = () => {
     }
   };
 
-  // ── Don't render on the landing page ──────────────────────────────────
-  if (location.pathname === '/') return null;
+  // ── Don't render on the home / landing page or privacy policy page ──
+  if (location.pathname === '/' || location.pathname === '/home' || location.pathname === '/privacy-policy' || location.pathname === '/privacy') return null;
 
   return (
     <>

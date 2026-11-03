@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/privacy.css';
-const dataudipiTitleImg = `/assets/images/Dataudupi-Title.png`;
+const dataudipiTitleImg = `/assets/images/Dataudupi-Title-Color.png`;
 
 export default function PrivacyPolicy() {
   const navigate = useNavigate();
@@ -50,16 +50,14 @@ export default function PrivacyPolicy() {
             <i className="fa-solid fa-arrow-left"></i>
             <span>Back</span>
           </button>
+        </div>
+        <div className="privacy-header-center">
           <img
             src={dataudipiTitleImg}
             alt="DATA UDIPI"
             className="privacy-brand-logo"
             onClick={() => navigate('/')}
           />
-        </div>
-        <div className="privacy-header-badge">
-          <i className="fa-solid fa-shield-halved"></i>
-          <span>Official Policy</span>
         </div>
       </header>
 
@@ -285,4 +283,5 @@ export default function PrivacyPolicy() {
       </main>
     </div>
   );
-}
+}
+

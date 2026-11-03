@@ -48,7 +48,8 @@ function PrivacyCornerBadge() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  if (location.pathname === '/privacy-policy' || location.pathname === '/privacy') {
+  // Only display Privacy Policy link on the Home page
+  if (location.pathname !== '/home' && location.pathname !== '/') {
     return null;
   }
 
